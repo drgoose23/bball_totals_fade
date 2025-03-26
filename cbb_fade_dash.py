@@ -4,7 +4,6 @@ import dash_bootstrap_components as dbc
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 
-# Game period mapping
 PERIOD_TIME_MAP = {
     'Quarter (10 min)': 10,
     'Half (20 min)': 20,
@@ -45,22 +44,23 @@ def get_fade_analysis(team1_points, team2_points, live_mkt_total, min_left, my_b
     }
 
 app.layout = dbc.Container([
-    html.H2("🏀 CBB Totals Fade System", className='text-center my-3'),
+    html.H2("🏀 BBall Totals Fade System", className='text-center my-3'),
 
     dbc.Row([
         dbc.Col([
-            dbc.Input(id="team1", type="number", placeholder="Team 1 Points", debounce=True),
-            dbc.Input(id="team2", type="number", placeholder="Team 2 Points", debounce=True, className="mt-2"),
-            dbc.Input(id="live_total", type="number", placeholder="Live Market Total", debounce=True, className="mt-2"),
-            dbc.Input(id="minutes_left", type="number", placeholder="Minutes Left", debounce=True, className="mt-2"),
-
+            html.Label("Select Period:", className="mb-1"),
             dcc.Dropdown(
                 id="period_type",
                 options=[{"label": k, "value": v} for k, v in PERIOD_TIME_MAP.items()],
                 value=40,
-                className="mt-2",
-                placeholder="Select Period"
+                clearable=False,
+                className="mb-3"
             ),
+
+            dbc.Input(id="team1", type="number", placeholder="Team 1 Points", debounce=True),
+            dbc.Input(id="team2", type="number", placeholder="Team 2 Points", debounce=True, className="mt-2"),
+            dbc.Input(id="live_total", type="number", placeholder="Live Market Total", debounce=True, className="mt-2"),
+            dbc.Input(id="minutes_left", type="number", placeholder="Minutes Left", debounce=True, className="mt-2"),
 
             html.Label("Threshold (pts/min):", className="mt-3"),
             dcc.Slider(
@@ -78,7 +78,7 @@ app.layout = dbc.Container([
         ], md=4),
 
         dbc.Col([
-            html.Div(id="output", className="mt-2")  # ✅ This is the missing component
+            html.Div(id="output", className="mt-2")
         ], md=8)
     ])
 ])
