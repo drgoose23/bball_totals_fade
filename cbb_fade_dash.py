@@ -11,7 +11,7 @@ PERIOD_TIME_MAP = {
     'Full Game (40 min)': 40
 }
 
-def get_fade_analysis(team1_points, team2_points, live_mkt_total, min_left, my_bet=None, total_game_time=40, threshold=5):
+def get_fade_analysis(team1_points, team2_points, live_mkt_total, min_left, my_bet=None, opening_line=None, total_game_time=40, threshold=5):
     total_current_points = team1_points + team2_points
     points_needed_for_over = live_mkt_total - total_current_points
     min_elapsed = total_game_time - min_left if min_left > 0 else total_game_time
@@ -30,6 +30,7 @@ def get_fade_analysis(team1_points, team2_points, live_mkt_total, min_left, my_b
     pts_needed_to_miss = my_bet - total_current_points
     pace_needed_for_my_bet_to_miss = pts_needed_to_miss / min_left if min_left > 0 else float('inf')
     busted = pts_needed_to_miss <= 0
+    opening_pace = opening_line / total_game_time if opening_line else None
 
     return {
         "decision": decision,
@@ -38,10 +39,11 @@ def get_fade_analysis(team1_points, team2_points, live_mkt_total, min_left, my_b
         "points_needed_for_over": points_needed_for_over,
         "current_pts_per_min": round(current_pts_per_min, 2),
         "market_pts_per_min": round(pts_per_min, 2),
+        "pace_needed_to_miss": round(pace_needed_for_my_bet_to_miss, 2),
         "label": label,
         "pts_needed_to_miss": pts_needed_to_miss,
-        "pace_needed_to_miss": round(pace_needed_for_my_bet_to_miss, 2),
-        "busted": busted
+        "busted": busted,
+        "opening_pace": round(opening_pace, 2) if opening_pace else None
     }
 
 app.layout = dbc.Container([
@@ -60,6 +62,7 @@ app.layout = dbc.Container([
 
             dbc.Input(id="team1", type="number", placeholder="Team 1 Points", debounce=True),
             dbc.Input(id="team2", type="number", placeholder="Team 2 Points", debounce=True, className="mt-2"),
+            dbc.Input(id="opening_line", type="number", placeholder="Opening Line", debounce=True, className="mt-2"),
             dbc.Input(id="live_total", type="number", placeholder="Live Market Total", debounce=True, className="mt-2"),
             dbc.Input(id="minutes_left", type="number", placeholder="Minutes Left", debounce=True, className="mt-2"),
 
@@ -90,27 +93,35 @@ app.layout = dbc.Container([
     State("team1", "value"),
     State("team2", "value"),
     State("live_total", "value"),
+    State("opening_line", "value"),
     State("minutes_left", "value"),
     State("my_bet", "value"),
     State("period_type", "value"),
     State("threshold", "value")
 )
-def update_output(n, team1, team2, live_total, min_left, my_bet, period_time, threshold):
+def update_output(n, team1, team2, live_total, opening_line, min_left, my_bet, period_time, threshold):
     if None in [team1, team2, live_total, min_left, period_time, threshold]:
         return dbc.Alert("Please fill in all required fields.", color="danger")
-    
-    result = get_fade_analysis(team1, team2, live_total, min_left, my_bet, period_time, threshold)
 
-    # Create pace comparison bar chart
-    fig = go.Figure(data=[
-        go.Bar(name="Current Pace", x=["Current"], y=[result['current_pts_per_min']]),
-        go.Bar(name="Market-Implied Pace", x=["Market"], y=[result['market_pts_per_min']]),
-        go.Bar(name="Pace to MISS Bet", x=["Your Bet"], y=[result['pace_needed_to_miss']])
-    ])
+    result = get_fade_analysis(team1, team2, live_total, min_left, my_bet, opening_line, period_time, threshold)
+
+    # Scatter line chart
+    pace_labels = []
+    pace_values = []
+
+    if result['opening_pace'] is not None:
+        pace_labels.append("Opening Pace")
+        pace_values.append(result['opening_pace'])
+
+    pace_labels += ["Current Pace", "Market-Implied Pace", "Pace to Miss Bet"]
+    pace_values += [result['current_pts_per_min'], result['market_pts_per_min'], result['pace_needed_to_miss']]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=pace_labels, y=pace_values, mode='markers+lines', marker=dict(size=12)))
     fig.update_layout(
-        barmode='group',
-        title="Pace Comparison (Points per Minute)",
-        yaxis_title="Pts per Min",
+        title="Pace Comparison",
+        yaxis_title="Points per Minute",
+        xaxis_title="",
         template="plotly_white",
         height=400
     )
@@ -123,9 +134,10 @@ def update_output(n, team1, team2, live_total, min_left, my_bet, period_time, th
             html.P(f"Points Needed for Over: {result['points_needed_for_over']}"),
             html.P(f"Current Pace (pts/min): {result['current_pts_per_min']}"),
             html.P(f"Market Implied Pace (pts/min): {result['market_pts_per_min']}"),
+            html.P(f"Pace Needed to MISS Bet: {result['pace_needed_to_miss']}"),
+            html.P(f"Opening Pace: {result['opening_pace']}" if result['opening_pace'] else ""),
             html.Hr(),
             html.P(f"{result['label']} - Points Needed to MISS: {result['pts_needed_to_miss']}"),
-            html.P(f"Pace Needed to MISS: {result['pace_needed_to_miss']}"),
             html.P("⚠️ Bet already likely busted." if result['busted'] else "", className="text-danger"),
             dcc.Graph(figure=fig, className="mt-4")
         ])
