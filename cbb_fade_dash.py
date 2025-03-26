@@ -62,20 +62,27 @@ app.layout = dbc.Container([
 
             dbc.Input(id="team1", type="number", placeholder="Team 1 Points", debounce=True),
             dbc.Input(id="team2", type="number", placeholder="Team 2 Points", debounce=True, className="mt-2"),
-            dbc.Input(id="opening_line", type="number", placeholder="Opening Line", debounce=True, className="mt-2"),
+            dbc.Input(id="opening_line", type="number", placeholder="Opening Line (optional)", debounce=True, className="mt-2"),
             dbc.Input(id="live_total", type="number", placeholder="Live Market Total", debounce=True, className="mt-2"),
             dbc.Input(id="minutes_left", type="number", placeholder="Minutes Left", debounce=True, className="mt-2"),
 
             html.Label("Threshold (pts/min):", className="mt-3"),
-            dcc.Slider(
-                id="threshold",
-                min=1,
-                max=10,
-                step=0.1,
-                value=5,
-                tooltip={"placement": "bottom", "always_visible": True},
-                className="mb-3"
-            ),
+            dbc.Row([
+                dbc.Col([
+                    dcc.Slider(
+                        id="threshold_slider",
+                        min=1,
+                        max=10,
+                        step=0.1,
+                        value=5,
+                        tooltip={"placement": "bottom", "always_visible": True},
+                        className="mb-3"
+                    )
+                ], width=8),
+                dbc.Col([
+                    dbc.Input(id="threshold_input", type="number", value=5, min=1, max=10, step=0.1)
+                ], width=4)
+            ]),
 
             dbc.Input(id="my_bet", type="number", placeholder="Your Bet (optional)", debounce=True, className="mt-2"),
             dbc.Button("Run Analysis", id="submit", color="primary", className="mt-3 w-100")
@@ -88,6 +95,25 @@ app.layout = dbc.Container([
 ])
 
 @app.callback(
+    Output("threshold_slider", "value"),
+    Output("threshold_input", "value"),
+    Input("threshold_slider", "value"),
+    Input("threshold_input", "value")
+)
+def sync_threshold(slider_val, input_val):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
+
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    if triggered_id == "threshold_slider":
+        return slider_val, slider_val
+    elif triggered_id == "threshold_input":
+        return input_val, input_val
+    else:
+        raise dash.exceptions.PreventUpdate
+
+@app.callback(
     Output("output", "children"),
     Input("submit", "n_clicks"),
     State("team1", "value"),
@@ -97,7 +123,7 @@ app.layout = dbc.Container([
     State("minutes_left", "value"),
     State("my_bet", "value"),
     State("period_type", "value"),
-    State("threshold", "value")
+    State("threshold_input", "value")
 )
 def update_output(n, team1, team2, live_total, opening_line, min_left, my_bet, period_time, threshold):
     if None in [team1, team2, live_total, min_left, period_time, threshold]:
