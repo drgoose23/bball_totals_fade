@@ -52,7 +52,7 @@ app.layout = dbc.Container([
             dcc.Dropdown(
                 id="period_type",
                 options=[{"label": k, "value": v} for k, v in PERIOD_TIME_MAP.items()],
-                value=40,
+                value=10,
                 clearable=False,
                 className="mb-3"
             ),
