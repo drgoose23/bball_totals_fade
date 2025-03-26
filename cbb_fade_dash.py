@@ -85,7 +85,7 @@ app.layout = dbc.Container([
             ]),
 
             dbc.Input(id="my_bet", type="number", placeholder="Your Bet (optional)", debounce=True, className="mt-2"),
-            dbc.Button("Run Analysis", id="submit", color="primary", className="mt-3 w-100")
+            dbc.Button("Run It", id="submit", color="primary", className="mt-3 w-100")
         ], md=4),
 
         dbc.Col([
