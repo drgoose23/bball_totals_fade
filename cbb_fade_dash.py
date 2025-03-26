@@ -1,6 +1,7 @@
 import dash
 from dash import html, dcc, Output, Input, State
 import dash_bootstrap_components as dbc
+import plotly.graph_objs as go
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 
@@ -100,6 +101,20 @@ def update_output(n, team1, team2, live_total, min_left, my_bet, period_time, th
     
     result = get_fade_analysis(team1, team2, live_total, min_left, my_bet, period_time, threshold)
 
+    # Create pace comparison bar chart
+    fig = go.Figure(data=[
+        go.Bar(name="Current Pace", x=["Current"], y=[result['current_pts_per_min']]),
+        go.Bar(name="Market-Implied Pace", x=["Market"], y=[result['market_pts_per_min']]),
+        go.Bar(name="Pace to MISS Bet", x=["Your Bet"], y=[result['pace_needed_to_miss']])
+    ])
+    fig.update_layout(
+        barmode='group',
+        title="Pace Comparison (Points per Minute)",
+        yaxis_title="Pts per Min",
+        template="plotly_white",
+        height=400
+    )
+
     return dbc.Card([
         dbc.CardBody([
             html.H4(f"Decision: {result['decision']}", className="card-title"),
@@ -111,7 +126,8 @@ def update_output(n, team1, team2, live_total, min_left, my_bet, period_time, th
             html.Hr(),
             html.P(f"{result['label']} - Points Needed to MISS: {result['pts_needed_to_miss']}"),
             html.P(f"Pace Needed to MISS: {result['pace_needed_to_miss']}"),
-            html.P("⚠️ Bet already likely busted." if result['busted'] else "", className="text-danger")
+            html.P("⚠️ Bet already likely busted." if result['busted'] else "", className="text-danger"),
+            dcc.Graph(figure=fig, className="mt-4")
         ])
     ])
 
