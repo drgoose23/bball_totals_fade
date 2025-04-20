@@ -11,10 +11,12 @@ PERIOD_TIME_MAP = {
     'Full Game (40 min)': 40
 }
 
-def get_fade_analysis(team1_points, team2_points, live_mkt_total, min_left, my_bet=None, opening_line=None, total_game_time=40, threshold=5):
+def get_fade_analysis(team1_points, team2_points, live_mkt_total, min_left, my_bet=None, opening_line=None,
+                      total_game_time=40, threshold=5, period_time=10):
     total_current_points = team1_points + team2_points
     points_needed_for_over = live_mkt_total - total_current_points
-    min_elapsed = total_game_time - min_left if min_left > 0 else total_game_time
+
+    min_elapsed = period_time - min_left if min_left > 0 else period_time
     current_pts_per_min = total_current_points / min_elapsed if min_elapsed > 0 else 0
     pts_per_min = points_needed_for_over / min_left if min_left > 0 else float('inf')
 
@@ -56,6 +58,18 @@ app.layout = dbc.Container([
                 id="period_type",
                 options=[{"label": k, "value": v} for k, v in PERIOD_TIME_MAP.items()],
                 value=10,
+                clearable=False,
+                className="mb-3"
+            ),
+
+            html.Label("Game Length (min):", className="mb-1"),
+            dcc.Dropdown(
+                id="game_length",
+                options=[
+                    {"label": "College (40 min)", "value": 40},
+                    {"label": "NBA (48 min)", "value": 48}
+                ],
+                value=40,
                 clearable=False,
                 className="mb-3"
             ),
@@ -123,15 +137,20 @@ def sync_threshold(slider_val, input_val):
     State("minutes_left", "value"),
     State("my_bet", "value"),
     State("period_type", "value"),
-    State("threshold_input", "value")
+    State("threshold_input", "value"),
+    State("game_length", "value")
 )
-def update_output(n, team1, team2, live_total, opening_line, min_left, my_bet, period_time, threshold):
-    if None in [team1, team2, live_total, min_left, period_time, threshold]:
+def update_output(n, team1, team2, live_total, opening_line, min_left, my_bet, period_time, threshold, game_length):
+    if None in [team1, team2, live_total, min_left, period_time, threshold, game_length]:
         return dbc.Alert("Please fill in all required fields.", color="danger")
 
-    result = get_fade_analysis(team1, team2, live_total, min_left, my_bet, opening_line, period_time, threshold)
+    result = get_fade_analysis(
+        team1, team2, live_total, min_left, my_bet, opening_line,
+        total_game_time=game_length,
+        threshold=threshold,
+        period_time=period_time
+    )
 
-    # Scatter line chart
     pace_labels = []
     pace_values = []
 
