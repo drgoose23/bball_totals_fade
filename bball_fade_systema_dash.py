@@ -5,17 +5,23 @@ import plotly.graph_objs as go
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 
-PERIOD_TIME_MAP = {
-    'Quarter (10 min)': 10,
-    'Half (20 min)': 20,
-    'Full Game (40 min)': 40
+PERIOD_TIME_MAPS = {
+    40: {
+        'Quater (10 min)': 10,
+        'Half (20 min)': 20,
+        'Full Game (40 min)': 40
+    },
+    48: {
+        'Quarter (12 min)': 12,
+        'Half (24 min)': 24,
+        'Full Game (48 min)': 48
+    }
 }
 
 def get_fade_analysis(team1_points, team2_points, live_mkt_total, min_left, my_bet=None, opening_line=None,
                       total_game_time=40, threshold=5, period_time=10):
     total_current_points = team1_points + team2_points
     points_needed_for_over = live_mkt_total - total_current_points
-
     min_elapsed = period_time - min_left if min_left > 0 else period_time
     current_pts_per_min = total_current_points / min_elapsed if min_elapsed > 0 else 0
     pts_per_min = points_needed_for_over / min_left if min_left > 0 else float('inf')
@@ -53,15 +59,6 @@ app.layout = dbc.Container([
 
     dbc.Row([
         dbc.Col([
-            html.Label("Select Period:", className="mb-1"),
-            dcc.Dropdown(
-                id="period_type",
-                options=[{"label": k, "value": v} for k, v in PERIOD_TIME_MAP.items()],
-                value=10,
-                clearable=False,
-                className="mb-3"
-            ),
-
             html.Label("Game Length (min):", className="mb-1"),
             dcc.Dropdown(
                 id="game_length",
@@ -70,6 +67,15 @@ app.layout = dbc.Container([
                     {"label": "NBA (48 min)", "value": 48}
                 ],
                 value=40,
+                clearable=False,
+                className="mb-3"
+            ),
+
+            html.Label("Select Period:", className="mb-1"),
+            dcc.Dropdown(
+                id="period_type",
+                options=[],
+                value=None,
                 clearable=False,
                 className="mb-3"
             ),
@@ -126,6 +132,18 @@ def sync_threshold(slider_val, input_val):
         return input_val, input_val
     else:
         raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output("period_type", "options"),
+    Output("period_type", "value"),
+    Input("game_length", "value")
+)
+def update_period_dropdown(game_length):
+    if game_length not in PERIOD_TIME_MAPS:
+        return [], None
+    options = [{"label": k, "value": v} for k, v in PERIOD_TIME_MAPS[game_length].items()]
+    default_value = options[0]['value']
+    return options, default_value
 
 @app.callback(
     Output("output", "children"),
