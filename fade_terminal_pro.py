@@ -1,9 +1,3 @@
-#### DONT TOUCH - THIS IS THE BEST ONE SO FAR ####
-
-
-
-
-
 import dash
 from dash import html, dcc, Output, Input, State, ALL, ctx
 import dash_bootstrap_components as dbc
