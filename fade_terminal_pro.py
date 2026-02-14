@@ -101,6 +101,27 @@ app.index_string = '''
                 background: rgba(74, 85, 104, 0.35) !important;
                 transform: scale(0.95);
             }
+            .btn-adj-small {
+                background: rgba(74, 85, 104, 0.1) !important;
+                border: 1px solid rgba(74, 85, 104, 0.15) !important;
+                color: #a0aec0 !important;
+                font-weight: 400;
+                border-radius: 3px;
+                transition: all 0.2s ease;
+                font-size: 0.7rem;
+                padding: 0.15rem 0.3rem;
+                min-width: 24px;
+                height: 28px;
+            }
+            .btn-adj-small:hover { 
+                background: rgba(74, 85, 104, 0.2) !important; 
+                color: #e2e8f0 !important;
+                border-color: rgba(74, 85, 104, 0.25) !important;
+            }
+            .btn-adj-small:active {
+                background: rgba(74, 85, 104, 0.3) !important;
+                transform: scale(0.92);
+            }
             .label { 
                 font-size: 0.75rem; 
                 color: #a0aec0; 
@@ -378,6 +399,19 @@ app.index_string = '''
             .modal-body {
                 position: relative;
                 z-index: 1040;
+            }
+            
+            /* Refresh button styling */
+            #refresh_selected_game_btn:hover {
+                background: rgba(74, 85, 104, 0.4) !important;
+                color: #e2e8f0 !important;
+                border-color: rgba(74, 85, 104, 0.6) !important;
+                transform: scale(1.05);
+            }
+            
+            #refresh_selected_game_btn:active {
+                background: rgba(74, 85, 104, 0.6) !important;
+                transform: scale(0.95);
             }
         </style>
         <script>
@@ -658,11 +692,20 @@ def get_basketball_odds(sport_key='basketball_ncaab'):
     }
     
     try:
+        print(f"🔍 Requesting odds from: {url}")
         response = requests.get(url, params=params)
         response.raise_for_status()
         
         games = response.json()
         print(f"📊 Odds API: Found {len(games)} games with betting lines")
+        
+        # Debug: Show first game if available
+        if games:
+            first_game = games[0]
+            print(f"🔍 Sample game: {first_game.get('away_team', 'Unknown')} @ {first_game.get('home_team', 'Unknown')}")
+        else:
+            print(f"⚠️ Odds API returned empty games list")
+        
         return games
         
     except requests.exceptions.RequestException as e:
@@ -796,6 +839,27 @@ def score_input(label, input_id):
         ], size="sm")
     ], className="mb-3")
 
+def small_input_with_buttons(label, input_id, placeholder="-", min_val=None, max_val=None):
+    input_props = {
+        "id": input_id, 
+        "type": "number", 
+        "placeholder": placeholder, 
+        "style": {"textAlign": "center"}
+    }
+    if min_val is not None:
+        input_props["min"] = min_val
+    if max_val is not None:
+        input_props["max"] = max_val
+    
+    return html.Div([
+        html.Div(label, className="label"),
+        dbc.InputGroup([
+            dbc.Button("−", id={"type": "dec_small", "index": input_id}, className="btn-adj-small px-1"),
+            dbc.Input(**input_props),
+            dbc.Button("+", id={"type": "inc_small", "index": input_id}, className="btn-adj-small px-1"),
+        ], size="sm")
+    ], className="mb-3")
+
 
 app.layout = dbc.Container([
     # Professional Header
@@ -921,6 +985,25 @@ def create_fade_tab():
                                 "transition": "all 0.2s ease"
                             }
                         ),
+                        # Small refresh button for selected game
+                        html.Div([
+                            dbc.Button(
+                                "🔄",
+                                id="refresh_selected_game_btn",
+                                color="secondary",
+                                size="sm",
+                                style={
+                                    "background": "rgba(74, 85, 104, 0.2)",
+                                    "border": "1px solid rgba(74, 85, 104, 0.4)",
+                                    "color": "#a0aec0",
+                                    "fontSize": "0.8rem",
+                                    "padding": "0.4rem 0.6rem",
+                                    "marginTop": "0.5rem",
+                                    "borderRadius": "6px"
+                                },
+                                title="Refresh live scores for selected game"
+                            )
+                        ], style={"textAlign": "right"}),
                         # Store selected game ID and button text separately for persistence
                         dcc.Store(id="live_game_selector", data=None),
                         dcc.Store(id="selected_game_text", data="Select Game"),
@@ -931,19 +1014,14 @@ def create_fade_tab():
                         dbc.Col(score_input("Away", "team2"), width=6),
                     ]),
                     
-                    html.Div([
-                        html.Div("Live Total", className="label"),
-                        dbc.Input(id="live_total", type="number", placeholder="-"),
-                    ], className="mb-3"),
+                    small_input_with_buttons("Live Total", "live_total"),
                     
                     dbc.Row([
                         dbc.Col([
-                            html.Div("Minutes", className="label"),
-                            dbc.Input(id="mins_left", type="number", placeholder="-", min=0)
+                            small_input_with_buttons("Minutes", "mins_left", min_val=0)
                         ], width=6),
                         dbc.Col([
-                            html.Div("Seconds", className="label"),
-                            dbc.Input(id="secs_left", type="number", placeholder="-", min=0, max=59)
+                            small_input_with_buttons("Seconds", "secs_left", min_val=0, max_val=59)
                         ], width=6),
                     ], className="mb-4"),
                     
@@ -1110,6 +1188,32 @@ def adj_scores(inc, dec, t1, t2):
     if t["index"] == "team1": t1 = max(0, t1 + d)
     elif t["index"] == "team2": t2 = max(0, t2 + d)
     return t1, t2
+
+@app.callback(
+    Output("live_total", "value"), Output("mins_left", "value"), Output("secs_left", "value"),
+    Input({"type": "inc_small", "index": ALL}, "n_clicks"),
+    Input({"type": "dec_small", "index": ALL}, "n_clicks"),
+    State("live_total", "value"), State("mins_left", "value"), State("secs_left", "value"),
+    prevent_initial_call=True
+)
+def adj_small_inputs(inc, dec, live_total, mins, secs):
+    if not ctx.triggered_id: raise dash.exceptions.PreventUpdate
+    t = ctx.triggered_id
+    
+    live_total = live_total or 0
+    mins = mins or 0
+    secs = secs or 0
+    
+    d = 1 if t["type"] == "inc_small" else -1
+    
+    if t["index"] == "live_total":
+        live_total = max(0, live_total + d)
+    elif t["index"] == "mins_left":
+        mins = max(0, mins + d)
+    elif t["index"] == "secs_left":
+        secs = max(0, min(59, secs + d))  # Keep seconds between 0-59
+    
+    return live_total, mins, secs
 
 
 # ESPN API Callbacks
@@ -1372,6 +1476,94 @@ def update_button_text(game_text):
     """Update button text from persistent storage"""
     return game_text or "Select Game"
 
+@app.callback(
+    Output("selected_game_data", "data", allow_duplicate=True),
+    Input("refresh_selected_game_btn", "n_clicks"),
+    State("persistent_game_selection", "data"),
+    prevent_initial_call=True
+)
+def refresh_selected_game_data(n_clicks, selected_game_id):
+    """Refresh the stored game data by fetching fresh data directly from ESPN"""
+    if not n_clicks or not selected_game_id:
+        raise dash.exceptions.PreventUpdate
+    
+    print(f"DEBUG: Refresh button clicked for game ID: {selected_game_id}")
+    
+    # Fetch fresh live games data directly from ESPN
+    try:
+        fresh_live_games = fetch_live_games()
+        print(f"DEBUG: Fetched {len(fresh_live_games)} fresh games from ESPN")
+        
+        # Find the selected game in fresh data
+        updated_game = None
+        for game in fresh_live_games:
+            if str(game.get('id')) == str(selected_game_id):
+                updated_game = game
+                break
+        
+        if not updated_game:
+            print(f"DEBUG: Could not find selected game {selected_game_id} in fresh ESPN data")
+            # Try fetching from multiple days
+            from datetime import datetime, timedelta
+            for days_offset in [-1, 0, 1]:  # Yesterday, today, tomorrow
+                date_str = (datetime.now() + timedelta(days=days_offset)).strftime('%Y%m%d')
+                day_games = fetch_games_by_date(date_str)
+                for game in day_games:
+                    if str(game.get('id')) == str(selected_game_id):
+                        updated_game = game
+                        print(f"DEBUG: Found game in {date_str} data")
+                        break
+                if updated_game:
+                    break
+        
+        if not updated_game:
+            print(f"DEBUG: Still could not find game {selected_game_id} anywhere")
+            raise dash.exceptions.PreventUpdate
+        
+        print(f"DEBUG: ✅ REFRESHING game data for {updated_game.get('away_team', '')} @ {updated_game.get('home_team', '')}")
+        print(f"DEBUG: ✅ Fresh scores - {updated_game.get('away_score', 0)}-{updated_game.get('home_score', 0)}")
+        print(f"DEBUG: ✅ Fresh time - {updated_game.get('clock', 'N/A')} (Period {updated_game.get('period', 'N/A')})")
+        print(f"DEBUG: ✅ Game state - {updated_game.get('state', 'N/A')}")
+        
+        # Return the fresh game data to update the store
+        return updated_game
+        
+    except Exception as e:
+        print(f"DEBUG: Error fetching fresh game data: {e}")
+        raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output("refresh_selected_game_btn", "style"),
+    Input("persistent_game_selection", "data")
+)
+def toggle_refresh_button_visibility(selected_game_id):
+    """Show refresh button only when a game is selected"""
+    base_style = {
+        "background": "rgba(74, 85, 104, 0.2)",
+        "border": "1px solid rgba(74, 85, 104, 0.4)",
+        "color": "#a0aec0",
+        "fontSize": "0.8rem",
+        "padding": "0.4rem 0.6rem",
+        "marginTop": "0.5rem",
+        "borderRadius": "6px"
+    }
+    
+    if selected_game_id:
+        # Game selected - show button with hover effect
+        base_style.update({
+            "display": "inline-block",
+            "opacity": "1",
+            "cursor": "pointer"
+        })
+    else:
+        # No game selected - hide button
+        base_style.update({
+            "display": "none",
+            "opacity": "0"
+        })
+    
+    return base_style
+
 # Removed legacy dropdown callback - now using modal selection only
 
 @app.callback(
@@ -1409,23 +1601,30 @@ def store_selected_game(game_id, games_data):
     prevent_initial_call=True
 )
 def auto_fill_from_game(game_data, betting_odds_data):
-    """Auto-fill scores, time, and sportsbook live total from selected game"""
+    """Auto-fill scores, time, and live total from selected game"""
     if not game_data:
+        print("DEBUG: ❌ auto_fill_from_game - No game data")
         raise dash.exceptions.PreventUpdate
     
+    print(f"DEBUG: 🔄 AUTO-FILL TRIGGERED for game ID: {game_data.get('id')}")
+    
     # Extract scores from ESPN data structure
-    home_score = game_data.get('home_score', 0)
-    away_score = game_data.get('away_score', 0)
+    home_score = int(game_data.get('home_score', 0) or 0)
+    away_score = int(game_data.get('away_score', 0) or 0)
     
     # Parse time from clock (e.g., "12:34" or "12:34.5")
     minutes_left = 0
     seconds_left = 0
     
-    if game_data.get('is_live') and game_data.get('clock'):
+    clock = game_data.get('clock', '0:00')
+    period = game_data.get('period', 2)
+    is_live = game_data.get('is_live', False)
+    state = game_data.get('state', 'unknown')
+    
+    print(f"DEBUG: Raw game data - Clock: {clock}, Period: {period}, State: {state}, IsLive: {is_live}")
+    
+    if is_live and clock:
         try:
-            clock = game_data.get('clock', '0:00')
-            period = game_data.get('period', 2)  # Default to 2nd half if unknown
-            
             if ':' in clock:
                 time_parts = clock.split(':')
                 minutes_left = int(time_parts[0])
@@ -1437,13 +1636,15 @@ def auto_fill_from_game(game_data, betting_odds_data):
                 if period == 1:  # First half - add 20 minutes for entire second half
                     original_mins = minutes_left
                     minutes_left += 20
-                    print(f"DEBUG: First half auto-fill conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
-                # If period == 2 (second half), leave as is
-        except (ValueError, IndexError):
+                    print(f"DEBUG: ✅ First half conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
+                else:
+                    print(f"DEBUG: ✅ Second half time kept as-is: {minutes_left}:{seconds_left:02d}")
+        except (ValueError, IndexError) as e:
+            print(f"DEBUG: ❌ Error parsing clock '{clock}': {e}")
             minutes_left = 0
             seconds_left = 0
     
-    # Get sportsbook live total from betting odds
+    # Get betting odds total for live_total - ONLY if betting line exists
     live_total = None
     if betting_odds_data and game_data:
         # Get team names for matching with betting data
@@ -1458,23 +1659,32 @@ def auto_fill_from_game(game_data, betting_odds_data):
         if betting_info:
             live_total = betting_info.get('avg_total')
             if live_total:
-                print(f"DEBUG: Found sportsbook total for {away_team_name} @ {home_team_name}: {live_total}")
+                print(f"DEBUG: ✅ Found betting total for {away_team_name} @ {home_team_name}: {live_total}")
             else:
-                print(f"DEBUG: No betting total found for {away_team_name} @ {home_team_name}")
+                print(f"DEBUG: ⚠️ No betting total in matched data for {away_team_name} @ {home_team_name}")
         else:
-            print(f"DEBUG: No betting data match for {away_team_name} @ {home_team_name}")
+            print(f"DEBUG: ⚠️ No betting data match for {away_team_name} @ {home_team_name}")
+            print(f"DEBUG: ⚠️ Available betting keys: {list(betting_odds_data.keys())[:5]}...")  # Show first 5 keys
+    else:
+        print(f"DEBUG: ⚠️ No betting odds data available or no game data")
     
-    # Fallback to ESPN current total if no sportsbook data
-    if live_total is None and home_score and away_score:
-        live_total = home_score + away_score
-        print(f"DEBUG: Using ESPN current total as fallback: {live_total}")
+    # DO NOT use ESPN fallback - leave live_total empty if no betting line
+    if live_total is None:
+        print(f"DEBUG: ❌ No betting line found - leaving Live Total empty")
     
-    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, total:{live_total}, mins:{minutes_left}, secs:{seconds_left}")
+    away_team = game_data.get('away_team', 'Away')
+    home_team = game_data.get('home_team', 'Home')
+    
+    print(f"DEBUG: ✅ AUTO-FILLING COMPLETE:")
+    print(f"DEBUG:   - Game: {away_team} @ {home_team}")
+    print(f"DEBUG:   - Scores: Away {away_score} - Home {home_score}")
+    print(f"DEBUG:   - Time: {minutes_left}:{seconds_left:02d}")
+    print(f"DEBUG:   - Live Total: {live_total} (from betting odds)")
     
     return (
-        home_score,
-        away_score,
-        live_total,
+        away_score,  # team1 = away team score
+        home_score,  # team2 = home team score
+        live_total,  # live_total from betting odds or ESPN fallback
         minutes_left,
         seconds_left
     )
@@ -1500,7 +1710,7 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
     
     r = get_fade_analysis(t1, t2, live_total, min_left, my_bet, period, threshold)
     pct = r['pct']
-    over_thresh = r['required_pace'] > r['threshold']
+    over_thresh = r['required_pace'] >= r['threshold']
     curr = r['actual_pace']
     req = r['required_pace']
     
