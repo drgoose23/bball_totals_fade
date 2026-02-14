@@ -391,11 +391,12 @@ def fetch_games_by_date(date_str=None):
     """Fetch college basketball games from ESPN's internal API for a specific date"""
     try:
         if date_str:
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}"
+            # Add parameters to get more comprehensive data
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}&limit=300"
         else:
             # For "today", use current date regardless of time - college games often span midnight
             today_str = datetime.now().strftime('%Y%m%d')
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={today_str}"
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={today_str}&limit=300"
         
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -993,32 +994,59 @@ def adj_scores(inc, dec, t1, t2):
 )
 def refresh_all_games(n):
     """Fetch all games data every interval"""
-    live_games = fetch_live_games()
-    
-    # Get today's date in YYYYMMDD format
+    # Expand date ranges for more comprehensive coverage
     today = datetime.now().strftime('%Y%m%d')
     tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y%m%d')
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
     
+    # Get today's games (including yesterday's late games that might still be live)
+    yesterday_games = fetch_games_by_date(yesterday)
     today_games = fetch_games_by_date(today)
     tomorrow_games = fetch_games_by_date(tomorrow)
     
-    # Get week's games (next 7 days)
+    # Combine all current/live games from multiple days for more options
+    all_current_games = yesterday_games + today_games + tomorrow_games
+    
+    # Also get games from the next few days to include busy game days
+    for days_ahead in range(2, 7):  # Days 2-6 ahead (Tuesday through Saturday)
+        future_date = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
+        future_games = fetch_games_by_date(future_date)
+        all_current_games.extend(future_games)
+    
+    # Show live games + upcoming games from all fetched days (not just today)
+    live_games = [g for g in all_current_games if g['state'] in ['in', 'pre']]
+    
+    # Get extended week's games (next 14 days for more options)
     week_games = []
-    for days_ahead in range(0, 7):
+    for days_ahead in range(-1, 14):  # Include yesterday through next 13 days
         date_str = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
         games = fetch_games_by_date(date_str)
         week_games.extend(games)
+    
+    # Remove duplicates based on game ID
+    seen_ids = set()
+    unique_week_games = []
+    for game in week_games:
+        if game['id'] not in seen_ids:
+            unique_week_games.append(game)
+            seen_ids.add(game['id'])
     
     # Fetch betting odds
     try:
         odds_games = get_basketball_odds()
         betting_data = extract_betting_totals(odds_games)
-        print(f"📊 Matched {len(betting_data)} games with betting lines")
+        print(f"📊 Game Summary:")
+        print(f"   Yesterday: {len(yesterday_games)} games")
+        print(f"   Today: {len(today_games)} games") 
+        print(f"   Tomorrow: {len(tomorrow_games)} games")
+        print(f"   Live/Upcoming: {len(live_games)} games (across all days)")
+        print(f"   Total Week: {len(unique_week_games)} games")
+        print(f"   Betting Lines: {len(betting_data)} matched")
     except Exception as e:
         print(f"❌ Error fetching odds: {e}")
         betting_data = {}
     
-    return live_games, today_games, tomorrow_games, week_games, betting_data
+    return live_games, today_games, tomorrow_games, unique_week_games, betting_data
 
 # Modal Callbacks
 @app.callback(
@@ -1270,16 +1298,18 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
     curr = r['actual_pace']
     req = r['required_pace']
     
-    # Signal logic
+    # Signal logic - Fixed to be less restrictive for Under signals
     if pct >= 25 and over_thresh:
         signal, signal_color, border_color = "Under", "#4ade80", "#4ade8044"
-    elif pct >= 10 and over_thresh:
+    elif pct >= 5 and over_thresh:  # Lowered from 10 to 5
         signal, signal_color, border_color = "Under", "#86efac", "#86efac33"
-    elif pct >= 0 or not over_thresh:
+    elif pct >= 0 and over_thresh:  # NEW: Show Under for any positive % when over threshold
+        signal, signal_color, border_color = "Under", "#a7f3d0", "#a7f3d033"
+    elif not over_thresh:  # Required pace below threshold - Hold
         signal, signal_color, border_color = "Hold", "#71717a", "#71717a33"
-    elif pct >= -15:
+    elif pct >= -15:  # Negative percentage but not too bad - Hold
         signal, signal_color, border_color = "Hold", "#fbbf24", "#fbbf2433"
-    else:
+    else:  # Very negative percentage - Pass
         signal, signal_color, border_color = "Pass", "#f87171", "#f8717133"
 
     # Pace visualization - line chart
