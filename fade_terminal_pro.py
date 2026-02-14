@@ -281,6 +281,14 @@ app.index_string = '''
                 font-weight: 600;
                 font-size: 0.8rem;
             }
+            
+            /* Analysis Game Cards */
+            .analysis-game-card:hover {
+                background: rgba(74, 85, 104, 0.15) !important;
+                border-color: rgba(74, 85, 104, 0.4) !important;
+                transform: translateY(-1px);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            }
         </style>
     </head>
     <body>
@@ -1361,8 +1369,48 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, today_games
     
     return dbc.CardBody(games_content), team_options, team_options
 
+# Auto-populate team selectors when game is clicked
+@app.callback(
+    [Output("team1_selector", "value"),
+     Output("team2_selector", "value")],
+    Input({"type": "analysis-game-card", "index": ALL}, "n_clicks"),
+    [State("today_games_data", "data"),
+     State("tomorrow_games_data", "data"),  
+     State("week_games_data", "data")],
+    prevent_initial_call=True
+)
+def populate_teams_from_game_click(game_clicks, today_games, tomorrow_games, week_games):
+    """Auto-populate team selectors when a game card is clicked"""
+    if not any(game_clicks):
+        raise dash.exceptions.PreventUpdate
+    
+    # Get the game ID from the callback context
+    if not ctx.triggered or not ctx.triggered[0]['prop_id']:
+        raise dash.exceptions.PreventUpdate
+    
+    game_id = ctx.triggered_id['index'] if ctx.triggered_id and 'index' in ctx.triggered_id else None
+    
+    if not game_id:
+        raise dash.exceptions.PreventUpdate
+    
+    # Find the game in all possible data sources
+    all_games = (today_games or []) + (tomorrow_games or []) + (week_games or [])
+    selected_game = next((game for game in all_games if str(game['id']) == str(game_id)), None)
+    
+    if not selected_game:
+        print(f"DEBUG: Game ID {game_id} not found in data")
+        raise dash.exceptions.PreventUpdate
+    
+    # Extract team IDs
+    home_team_id = selected_game.get('home_team_id')
+    away_team_id = selected_game.get('away_team_id')
+    
+    print(f"DEBUG: Auto-selected teams from game click - Away: {away_team_id} ({selected_game.get('away_team')}), Home: {home_team_id} ({selected_game.get('home_team')})")
+    
+    return away_team_id, home_team_id  # Team 1 = Away, Team 2 = Home
+
 def create_game_card(game):
-    """Create a card for displaying game information"""
+    """Create a clickable card for displaying game information"""
     status_color = "#4ade80" if game['is_live'] else "#71717a" if game['state'] == 'pre' else "#f87171"
     status_text = "LIVE" if game['is_live'] else "UPCOMING" if game['state'] == 'pre' else "FINAL"
     
@@ -1396,7 +1444,10 @@ def create_game_card(game):
                     html.Span(game['away_team'], style={"fontSize": "0.85rem", "color": "#e5e5e5"}),
                     html.Span(f" {score_display} ", style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#fff", "margin": "0 6px"}),
                     html.Span(game['home_team'], style={"fontSize": "0.85rem", "color": "#e5e5e5"})
-                ])
+                ]),
+                html.Div([
+                    html.Span("Click to analyze teams →", style={"fontSize": "0.65rem", "color": "#4a5568", "fontStyle": "italic"})
+                ], style={"marginTop": "4px"})
             ], width=7),
             dbc.Col([
                 html.Div([
@@ -1406,14 +1457,15 @@ def create_game_card(game):
                 ], className="text-right")
             ], width=5)
         ])
-    ], style={
+    ], id={"type": "analysis-game-card", "index": game['id']}, n_clicks=0, style={
         "padding": "10px 12px",
         "margin": "6px 0",
         "border": "1px solid #2a2a2a",
         "borderRadius": "8px",
         "background": "#1a1a1a",
-        "cursor": "pointer" if game['is_live'] else "default"
-    })
+        "cursor": "pointer",
+        "transition": "all 0.2s ease"
+    }, className="analysis-game-card")
 
 def get_team_stats(team_id, num_games=10):
     """Helper function to get team statistics"""
