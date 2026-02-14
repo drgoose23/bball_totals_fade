@@ -1365,7 +1365,7 @@ def update_team_context(selected_game_data, games_count):
             dbc.Row([
                 dbc.Col([
                     html.Div([
-                        html.Div("Projected Total", className="metric-label"),
+                        html.Div("Theoretical Total", className="metric-label"),
                         html.Div(f"{implied_total:.1f}", 
                                 style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
                     ])
