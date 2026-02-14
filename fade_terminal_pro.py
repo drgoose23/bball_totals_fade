@@ -72,11 +72,40 @@ app.index_string = '''
                 background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
                 margin: 16px 0;
             }
+            /* Dropdown Styling for Dark Theme */
             .Select-control { background: #222 !important; border-color: #333 !important; }
             .Select-value-label, .Select-placeholder, .Select-input input { color: #fff !important; }
             .Select-menu-outer { background: #222 !important; border-color: #333 !important; }
-            .Select-option.is-focused { background: #333 !important; }
+            .Select-option { background: #222 !important; color: #fff !important; }
+            .Select-option.is-focused { background: #333 !important; color: #fff !important; }
+            .Select-option:hover { background: #333 !important; color: #fff !important; }
             .Select-arrow { border-color: #666 transparent transparent !important; }
+            
+            /* Modern Dash Dropdown Styling */
+            .dash-dropdown .Select-control { background: #222 !important; border-color: #333 !important; }
+            .dash-dropdown .Select-value-label, .dash-dropdown .Select-placeholder { color: #fff !important; }
+            .dash-dropdown .Select-menu-outer { background: #222 !important; border-color: #333 !important; }
+            .dash-dropdown .Select-option { background: #222 !important; color: #fff !important; padding: 8px 12px !important; }
+            .dash-dropdown .Select-option.is-focused { background: #333 !important; color: #fff !important; }
+            .dash-dropdown .Select-option:hover { background: #333 !important; color: #fff !important; }
+            
+            /* Newer Dash Component Styling */
+            .dash-dropdown > div > div { background: #222 !important; border-color: #333 !important; }
+            .dash-dropdown .dropdown-content { background: #222 !important; border-color: #333 !important; }
+            .dash-dropdown .dropdown-content .dropdown-item { color: #fff !important; background: #222 !important; }
+            .dash-dropdown .dropdown-content .dropdown-item:hover { background: #333 !important; color: #fff !important; }
+            
+            /* Dark Dropdown Class Styling */
+            .dark-dropdown .Select-control { background: #222 !important; border-color: #333 !important; color: #fff !important; }
+            .dark-dropdown .Select-placeholder { color: #999 !important; }
+            .dark-dropdown .Select-value-label { color: #fff !important; }
+            .dark-dropdown .Select-input > input { color: #fff !important; }
+            .dark-dropdown .Select-menu-outer { background: #222 !important; border-color: #333 !important; }
+            .dark-dropdown .Select-menu { background: #222 !important; }
+            .dark-dropdown .Select-option { color: #fff !important; background: #222 !important; }
+            .dark-dropdown .Select-option.is-focused { background: #333 !important; color: #fff !important; }
+            .dark-dropdown .Select-option.is-selected { background: #444 !important; color: #fff !important; }
+            .dark-dropdown .Select-arrow-zone { border-color: #666 transparent transparent !important; }
         </style>
     </head>
     <body>
@@ -318,11 +347,11 @@ def create_fade_tab():
                             dcc.Dropdown(id="game_length", options=[
                                 {"label": "NCAA", "value": 40},
                                 {"label": "NBA", "value": 48}
-                            ], value=40, clearable=False)
+                            ], value=40, clearable=False, className="dark-dropdown")
                         ], width=6),
                         dbc.Col([
                             html.Div("Period", className="label"),
-                            dcc.Dropdown(id="period_type", options=[], value=None, clearable=False)
+                            dcc.Dropdown(id="period_type", options=[], value=None, clearable=False, className="dark-dropdown")
                         ], width=6),
                     ], className="mb-3"),
                     
@@ -335,7 +364,9 @@ def create_fade_tab():
                             id="live_game_selector",
                             options=[],
                             placeholder="Select live game or enter manually below...",
-                            clearable=True
+                            clearable=True,
+                            style={"color": "#fff"},
+                            className="dark-dropdown"
                         ),
                     ], className="mb-4"),
                     
@@ -409,7 +440,8 @@ def create_analysis_tab():
                                 options=[],
                                 placeholder="Select Team 1...",
                                 clearable=True,
-                                searchable=True
+                                searchable=True,
+                                className="dark-dropdown"
                             ),
                         ], width=6),
                         dbc.Col([
@@ -418,10 +450,24 @@ def create_analysis_tab():
                                 options=[],
                                 placeholder="Select Team 2...",
                                 clearable=True,
-                                searchable=True
+                                searchable=True,
+                                className="dark-dropdown"
                             ),
                         ], width=6),
                     ]),
+                ], className="mb-3"),
+                
+                html.Div([
+                    html.Div([
+                        html.Span("Recent Games: ", className="label", style={"display": "inline-block", "marginRight": "10px"}),
+                        html.Span(id="games_count_display", style={"fontSize": "0.8rem", "color": "#f59e0b", "fontWeight": "600"})
+                    ]),
+                    dcc.Slider(
+                        id="games_count_slider",
+                        min=5, max=20, step=5, value=10,
+                        marks={5: '5', 10: '10', 15: '15', 20: '20'},
+                        tooltip={"placement": "bottom", "always_visible": False}
+                    )
                 ], className="mb-3"),
                 
                 html.Div(id="team-analysis-display", className="card", style={"minHeight": "400px"})
@@ -852,21 +898,46 @@ def get_team_stats(team_id, num_games=10):
         'away_games': len(away_games)
     }
 
+def get_team_name_from_options(team_id, team_options):
+    """Helper function to get team name from dropdown options"""
+    if not team_id or not team_options:
+        return None
+    
+    for option in team_options:
+        if str(option.get('value')) == str(team_id):
+            return option.get('label')
+    return None
+
+@app.callback(
+    Output("games_count_display", "children"),
+    Input("games_count_slider", "value")
+)
+def update_games_count_display(games_count):
+    """Update the games count display"""
+    return f"{games_count} games"
+
 @app.callback(
     Output("team-analysis-display", "children"),
     Input("team1_selector", "value"),
-    Input("team2_selector", "value")
+    Input("team2_selector", "value"),
+    Input("games_count_slider", "value"),
+    State("team1_selector", "options"),
+    State("team2_selector", "options")
 )
-def update_team_comparison(team1_id, team2_id):
+def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options):
     """Update team comparison analysis display"""
     if not team1_id and not team2_id:
         return dbc.CardBody([
             html.P("Select teams to compare their recent performance", className="text-center text-muted py-4")
         ])
     
-    # Get stats for both teams
-    team1_stats = get_team_stats(team1_id) if team1_id else None
-    team2_stats = get_team_stats(team2_id) if team2_id else None
+    # Get team names from options
+    team1_name = get_team_name_from_options(team1_id, team1_options) if team1_id else None
+    team2_name = get_team_name_from_options(team2_id, team2_options) if team2_id else None
+    
+    # Get stats for both teams with specified games count
+    team1_stats = get_team_stats(team1_id, games_count) if team1_id else None
+    team2_stats = get_team_stats(team2_id, games_count) if team2_id else None
     
     if not team1_stats and not team2_stats:
         return dbc.CardBody([
@@ -892,7 +963,8 @@ def update_team_comparison(team1_id, team2_id):
             dbc.Row([
                 # Team 1 Column
                 dbc.Col([
-                    html.H6("Team 1", className="text-center mb-3", style={"color": "#4ade80"}),
+                    html.H6(team1_name or "Team 1", className="text-center mb-3", 
+                           style={"color": "#4ade80", "fontSize": "1rem", "fontWeight": "600"}),
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team1_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#4ade80", "textAlign": "center"}),
@@ -909,7 +981,8 @@ def update_team_comparison(team1_id, team2_id):
                 
                 # Team 2 Column  
                 dbc.Col([
-                    html.H6("Team 2", className="text-center mb-3", style={"color": "#3b82f6"}),
+                    html.H6(team2_name or "Team 2", className="text-center mb-3", 
+                           style={"color": "#3b82f6", "fontSize": "1rem", "fontWeight": "600"}),
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team2_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#3b82f6", "textAlign": "center"}),
@@ -923,10 +996,18 @@ def update_team_comparison(team1_id, team2_id):
         ])
     
     # Show individual team stats
-    for i, (team_stats, team_color, team_label) in enumerate([
-        (team1_stats, "#4ade80", "Team 1" if team1_stats and team2_stats else "Team Analysis"),
-        (team2_stats, "#3b82f6", "Team 2")
-    ]):
+    team_labels = []
+    if team1_stats and team2_stats:
+        team_labels = [
+            (team1_stats, "#4ade80", team1_name or "Team 1"), 
+            (team2_stats, "#3b82f6", team2_name or "Team 2")
+        ]
+    elif team1_stats:
+        team_labels = [(team1_stats, "#4ade80", team1_name or "Team Analysis")]
+    elif team2_stats:
+        team_labels = [(team2_stats, "#3b82f6", team2_name or "Team Analysis")]
+    
+    for i, (team_stats, team_color, team_label) in enumerate(team_labels):
         if not team_stats:
             continue
             
@@ -954,7 +1035,7 @@ def update_team_comparison(team1_id, team2_id):
                 ], className="text-center"),
             ], className="mb-3"),
             
-            # Recent games for this team
+            # Recent games for this team (show last 5 for compact display)
             html.Div([
                 html.Span(f"Recent Games ({len(team_stats['recent_games'][-5:])})", 
                          style={"fontSize": "0.85rem", "color": "#e5e5e5", "fontWeight": "500"}),
@@ -981,7 +1062,7 @@ def update_team_comparison(team1_id, team2_id):
                         "border": "1px solid #2a2a2a",
                         "borderRadius": "4px",
                         "background": "#1a1a1a"
-                    }) for game in team_stats['recent_games'][-5:]  # Show last 5 games
+                    }) for game in team_stats['recent_games'][-5:]
                 ], className="mt-2")
             ])
         ])
