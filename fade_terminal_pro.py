@@ -3,13 +3,50 @@ from dash import html, dcc, Output, Input, State, ALL, ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 
 app = dash.Dash(__name__, external_stylesheets=[
     dbc.themes.BOOTSTRAP,
     "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
 ], suppress_callback_exceptions=True)
+
+def convert_utc_to_est(utc_time_str):
+    """Convert UTC time string to EST/EDT (automatically handles DST)"""
+    try:
+        # Parse UTC time from ESPN API
+        dt_utc = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
+        
+        # Convert to Eastern Time (automatically handles EST/EDT based on date)
+        # During standard time: UTC-5 (EST)
+        # During daylight time: UTC-4 (EDT)
+        
+        # Simple DST check: 2nd Sunday in March to 1st Sunday in November
+        # For basketball season (Nov-April), mostly EST except March games
+        year = dt_utc.year
+        
+        # Approximate DST dates (this covers most cases accurately)
+        # DST starts 2nd Sunday in March, ends 1st Sunday in November
+        march_second_sunday = 8 + (6 - datetime(year, 3, 8).weekday()) % 7
+        nov_first_sunday = 1 + (6 - datetime(year, 11, 1).weekday()) % 7
+        
+        dst_start = datetime(year, 3, march_second_sunday, 7, 0, tzinfo=timezone.utc)  # 2 AM EST = 7 AM UTC
+        dst_end = datetime(year, 11, nov_first_sunday, 6, 0, tzinfo=timezone.utc)    # 2 AM EDT = 6 AM UTC
+        
+        # Check if we're in DST period
+        if dst_start <= dt_utc < dst_end:
+            # EDT (UTC-4)
+            et_tz = timezone(timedelta(hours=-4))
+        else:
+            # EST (UTC-5) 
+            et_tz = timezone(timedelta(hours=-5))
+        
+        dt_et = dt_utc.astimezone(et_tz)
+        return dt_et
+        
+    except Exception as e:
+        print(f"Error converting time: {e}")
+        return None
 
 app.index_string = '''
 <!DOCTYPE html>
@@ -543,8 +580,11 @@ def format_game_option(game):
         }
     else:
         try:
-            dt = datetime.fromisoformat(game['date'].replace('Z', '+00:00'))
-            time = dt.strftime('%I:%M%p').lower().replace('m', '')
+            dt_est = convert_utc_to_est(game['date'])
+            if dt_est:
+                time = dt_est.strftime('%I:%M%p EST').lower().replace('m', '')
+            else:
+                time = game['clock']
         except:
             time = game['clock']
         
@@ -942,8 +982,11 @@ def populate_game_modal(games_data):
             details = f"{game['away_score']}-{game['home_score']} • Total: {game['away_score'] + game['home_score']}"
         else:
             try:
-                dt = datetime.fromisoformat(game['date'].replace('Z', '+00:00'))
-                time_str = dt.strftime('%I:%M%p').lower().replace('m', '')
+                dt_est = convert_utc_to_est(game['date'])
+                if dt_est:
+                    time_str = dt_est.strftime('%I:%M%p EST').lower().replace('m', '')
+                else:
+                    time_str = game['clock']
             except:
                 time_str = game['clock']
             time_display = html.Div(time_str, className="game-time")
@@ -1365,7 +1408,7 @@ def update_team_context(selected_game_data, games_count):
             dbc.Row([
                 dbc.Col([
                     html.Div([
-                        html.Div("Theoretical Total", className="metric-label"),
+                        html.Div("Projected Total", className="metric-label"),
                         html.Div(f"{implied_total:.1f}", 
                                 style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
                     ])
@@ -1597,8 +1640,11 @@ def create_game_card(game):
     time_display = game['clock']
     if game['state'] == 'pre':
         try:
-            dt = datetime.fromisoformat(game['date'].replace('Z', '+00:00'))
-            time_display = dt.strftime('%I:%M %p ET')
+            dt_est = convert_utc_to_est(game['date'])
+            if dt_est:
+                time_display = dt_est.strftime('%I:%M %p EST')
+            else:
+                time_display = game['clock']
         except:
             time_display = game['clock']
     
