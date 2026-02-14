@@ -4,9 +4,7 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import requests
 from datetime import datetime, timedelta, timezone
-import json
 
-# Odds API Configuration
 ODDS_API_KEY = 'c352f4d244a2a3ae32f32136f8d908ac'
 ODDS_BASE_URL = 'https://api.the-odds-api.com/v4'
 
@@ -341,7 +339,66 @@ app.index_string = '''
             .team-logo[src=""], .team-logo:not([src]) {
                 display: none;
             }
+            
+            /* Game Search Input */
+            #game_search_input.form-control {
+                /* Prevent event bubbling that might close modal */
+                z-index: 1050 !important;
+                position: relative !important;
+            }
+            
+            #game_search_input.form-control:focus {
+                border-color: #4fd1c7 !important;
+                box-shadow: 0 0 0 2px rgba(79, 209, 199, 0.2) !important;
+                z-index: 1051 !important;
+            }
+            
+            #game_search_input.form-control::placeholder {
+                color: #718096 !important;
+                font-style: italic;
+            }
+            
+            /* Prevent modal from closing when clicking in search area */
+            .modal-body {
+                position: relative;
+                z-index: 1040;
+            }
         </style>
+        <script>
+            // Prevent modal from closing when interacting with search input
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('Setting up search input protection...');
+                
+                // Add event listeners to prevent modal close on search input interaction
+                document.addEventListener('click', function(e) {
+                    if (e.target && (e.target.id === 'game_search_input' || e.target.id === 'clear_search_btn')) {
+                        console.log('Preventing click propagation for search elements');
+                        e.stopPropagation();
+                    }
+                });
+                
+                document.addEventListener('keydown', function(e) {
+                    if (e.target && e.target.id === 'game_search_input') {
+                        console.log('Preventing keydown propagation for search input');
+                        e.stopPropagation();
+                    }
+                });
+                
+                document.addEventListener('input', function(e) {
+                    if (e.target && e.target.id === 'game_search_input') {
+                        console.log('Search input changed:', e.target.value);
+                        e.stopPropagation();
+                    }
+                });
+                
+                document.addEventListener('focus', function(e) {
+                    if (e.target && e.target.id === 'game_search_input') {
+                        console.log('Search input focused');
+                        e.stopPropagation();
+                    }
+                });
+            });
+        </script>
     </head>
     <body>
         {%app_entry%}
@@ -730,7 +787,7 @@ app.layout = dbc.Container([
     dcc.Store(id="tomorrow_games_data", data=[]),
     dcc.Store(id="week_games_data", data=[]),
     dcc.Store(id="betting_odds_data", data={}),
-    dcc.Interval(id="refresh_games", interval=15*1000, n_intervals=0),  # Refresh every 15 seconds
+    dcc.Interval(id="refresh_games", interval=30*1000, n_intervals=0),  # Refresh every 30 seconds (less frequent to avoid search interference)
     
     # Game Selection Modal
     dbc.Modal([
@@ -738,12 +795,47 @@ app.layout = dbc.Container([
             html.H4("Select Game", style={"color": "#f7fafc", "margin": "0"}),
         ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"}),
         dbc.ModalBody([
-            html.Div(id="game_selection_grid", style={"maxHeight": "60vh", "overflowY": "auto"})
+            # Search bar
+            html.Div([
+                dbc.InputGroup([
+                    dbc.Input(
+                        id="game_search_input",
+                        placeholder="Search teams (e.g., 'Duke', 'Carolina', 'Lakers')...",
+                        type="text",
+                        autoComplete="off",
+                        style={
+                            "background": "rgba(45, 55, 72, 0.9)",
+                            "border": "1px solid rgba(74, 85, 104, 0.5)",
+                            "borderRadius": "8px 0 0 8px",
+                            "color": "#f7fafc",
+                            "fontSize": "0.9rem",
+                            "padding": "0.75rem"
+                        }
+                    ),
+                    dbc.Button(
+                        "✕",
+                        id="clear_search_btn",
+                        color="secondary",
+                        size="sm",
+                        style={
+                            "background": "rgba(74, 85, 104, 0.3)",
+                            "border": "1px solid rgba(74, 85, 104, 0.5)",
+                            "borderRadius": "0 8px 8px 0",
+                            "color": "#a0aec0",
+                            "fontSize": "0.8rem",
+                            "padding": "0.5rem",
+                            "minWidth": "40px"
+                        }
+                    )
+                ], className="mb-3")
+            ]),
+            # Games grid
+            html.Div(id="game_selection_grid", style={"maxHeight": "50vh", "overflowY": "auto"})
         ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none", "padding": "1.5rem"}),
         dbc.ModalFooter([
             dbc.Button("Cancel", id="game_modal_close", className="pro-button-secondary", size="sm")
         ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"})
-    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static")
+    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static", keyboard=False)
 ], fluid=True, style={"maxWidth": "1400px", "padding": "0 2rem"})
 
 
@@ -1064,30 +1156,72 @@ def toggle_game_modal(open_clicks, close_clicks, game_clicks, is_open, active_ta
         # Only process if we're on the fade tab (where the button exists)
         if active_tab != "fade-tab":
             return False
+        
+        # Get the component that triggered this callback
+        triggered_id = ctx.triggered_id
+        print(f"DEBUG: Modal callback triggered by: {triggered_id}")
             
         # Only open when button is explicitly clicked
-        if ctx.triggered_id == "game_selector_button" and open_clicks:
+        if triggered_id == "game_selector_button" and open_clicks:
+            print("DEBUG: Opening modal")
             return True
-        # Close when cancel clicked or any game card clicked
-        elif ctx.triggered_id == "game_modal_close" or (game_clicks and any(game_clicks)):
+        # Close when cancel clicked
+        elif triggered_id == "game_modal_close" and close_clicks:
+            print("DEBUG: Closing modal - cancel button")
             return False
-        # Default to closed state
-        return False
-    except Exception:
-        # Graceful fallback for any callback issues
-        return False
+        # Close when game card clicked
+        elif triggered_id and "game-card" in str(triggered_id) and game_clicks and any(game_clicks):
+            print("DEBUG: Closing modal - game selected")
+            return False
+        # Stay in current state for any other triggers
+        else:
+            print(f"DEBUG: Keeping modal state: {is_open}")
+            return is_open
+    except Exception as e:
+        print(f"DEBUG: Modal callback error: {e}")
+        # Graceful fallback - maintain current state
+        return is_open if is_open is not None else False
+
+@app.callback(
+    Output("game_search_input", "value", allow_duplicate=True),
+    Input("clear_search_btn", "n_clicks"),
+    prevent_initial_call=True
+)
+def clear_search_input(n_clicks):
+    """Clear search input when X button is clicked"""
+    if n_clicks:
+        return ""
+    raise dash.exceptions.PreventUpdate
 
 @app.callback(
     Output("game_selection_grid", "children"),
-    Input("live_games_data", "data")
+    Input("live_games_data", "data"),
+    Input("game_search_input", "value")
 )
-def populate_game_modal(games_data):
-    """Populate modal with game cards"""
+def populate_game_modal(games_data, search_term):
+    """Populate modal with game cards (with search filtering)"""
+    print(f"DEBUG: populate_game_modal called with search_term: '{search_term}', games: {len(games_data) if games_data else 0}")
+    
     if not games_data:
         return html.Div("No games available", style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
     
+    # Filter games based on search term
+    filtered_games = games_data
+    if search_term and len(search_term.strip()) > 0:
+        search_lower = search_term.lower().strip()
+        filtered_games = []
+        for game in games_data:
+            # Search in team names
+            if (search_lower in game.get('home_team', '').lower() or 
+                search_lower in game.get('away_team', '').lower()):
+                filtered_games.append(game)
+    
+    if not filtered_games:
+        search_msg = f"No games found for '{search_term}'" if search_term else "No games available"
+        return html.Div(search_msg, style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
+    
     game_cards = []
-    for i, game in enumerate(games_data):
+    for i, game in enumerate(filtered_games):
         if game['is_live']:
             time_display = html.Div([
                 html.Span("LIVE", className="live-indicator"),
@@ -1138,11 +1272,12 @@ def populate_game_modal(games_data):
     [Output("live_game_selector", "data"),
      Output("selected_game_text", "data")],
     [Input({"type": "game-card", "index": ALL}, "n_clicks")],
-    [State("live_games_data", "data")],
+    [State("live_games_data", "data"),
+     State("game_search_input", "value")],
     prevent_initial_call=True
 )
-def select_game_from_modal(game_clicks, games_data):
-    """Handle game selection from modal"""
+def select_game_from_modal(game_clicks, games_data, search_term):
+    """Handle game selection from modal (with search filtering)"""
     print(f"DEBUG: select_game_from_modal called with clicks: {game_clicks}, games_data length: {len(games_data) if games_data else 0}")
     
     # Don't reset if no clicks - this was causing the reset!
@@ -1154,6 +1289,16 @@ def select_game_from_modal(game_clicks, games_data):
         print("DEBUG: No games data - preventing update")
         raise dash.exceptions.PreventUpdate
     
+    # Apply same filtering logic as populate_game_modal
+    filtered_games = games_data
+    if search_term and len(search_term.strip()) > 0:
+        search_lower = search_term.lower().strip()
+        filtered_games = []
+        for game in games_data:
+            if (search_lower in game.get('home_team', '').lower() or 
+                search_lower in game.get('away_team', '').lower()):
+                filtered_games.append(game)
+    
     # Find which game was clicked (look for the highest click count)
     clicked_index = None
     max_clicks = 0
@@ -1162,8 +1307,8 @@ def select_game_from_modal(game_clicks, games_data):
             max_clicks = clicks
             clicked_index = i
     
-    if clicked_index is not None and clicked_index < len(games_data):
-        selected_game = games_data[clicked_index]
+    if clicked_index is not None and clicked_index < len(filtered_games):
+        selected_game = filtered_games[clicked_index]
         
         # Create display text with live score if available
         if selected_game.get('is_live'):
