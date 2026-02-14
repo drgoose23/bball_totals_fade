@@ -21,91 +21,216 @@ app.index_string = '''
         {%css%}
         <style>
             body {
-                background: #111;
+                background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
                 font-family: 'Inter', sans-serif;
-                color: #e5e5e5;
+                color: #e2e8f0;
+                font-weight: 400;
             }
             .card {
-                background: #1a1a1a;
-                border: 1px solid #2a2a2a;
+                background: rgba(26, 32, 44, 0.8);
+                border: 1px solid rgba(74, 85, 104, 0.3);
                 border-radius: 12px;
+                backdrop-filter: blur(8px);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
             }
             .form-control {
-                background: #222 !important;
-                border: 1px solid #333 !important;
-                color: #fff !important;
-                font-weight: 500;
+                background: rgba(26, 32, 44, 0.7) !important;
+                border: 1px solid rgba(74, 85, 104, 0.4) !important;
+                color: #e2e8f0 !important;
+                font-weight: 400;
+                border-radius: 6px !important;
+                font-size: 0.9rem;
+                padding: 0.6rem 0.8rem;
+                transition: all 0.2s ease;
             }
             .form-control:focus {
-                border-color: #555 !important;
-                box-shadow: none !important;
+                border-color: #4a5568 !important;
+                box-shadow: 0 0 0 2px rgba(74, 85, 104, 0.2) !important;
             }
-            .form-control::placeholder { color: #555 !important; }
+            .form-control::placeholder { color: #718096 !important; }
             .btn-adj {
-                background: #252525;
-                border: 1px solid #333;
-                color: #888;
-                font-weight: 600;
+                background: rgba(74, 85, 104, 0.15) !important;
+                border: 1px solid rgba(74, 85, 104, 0.2) !important;
+                color: #a0aec0 !important;
+                font-weight: 500;
+                border-radius: 4px;
+                transition: all 0.2s ease;
+                font-size: 0.8rem;
+                padding: 0.25rem 0.5rem;
+                min-width: 32px;
             }
-            .btn-adj:hover { background: #333; color: #fff; border-color: #444; }
-            .label { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-            .value { font-size: 1.8rem; font-weight: 700; }
+            .btn-adj:hover { 
+                background: rgba(74, 85, 104, 0.25) !important; 
+                color: #e2e8f0 !important;
+                border-color: rgba(74, 85, 104, 0.3) !important;
+            }
+            .btn-adj:active {
+                background: rgba(74, 85, 104, 0.35) !important;
+                transform: scale(0.95);
+            }
+            .label { 
+                font-size: 0.75rem; 
+                color: #a0aec0; 
+                text-transform: uppercase; 
+                letter-spacing: 0.8px; 
+                margin-bottom: 0.5rem; 
+                font-weight: 500;
+            }
             .output-card {
-                background: #1a1a1a;
-                border: 1px solid #2a2a2a;
-                border-radius: 16px;
+                background: rgba(24, 24, 27, 0.9);
+                border: 1px solid rgba(39, 39, 42, 0.6);
+                border-radius: 20px;
+                backdrop-filter: blur(12px);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
             }
             .metric-value { 
                 font-weight: 600;
-                font-size: 1.75rem;
-                letter-spacing: -0.5px;
+                font-size: 2rem;
+                letter-spacing: -0.02em;
+                line-height: 1;
             }
             .metric-label {
-                font-size: 0.7rem;
+                font-size: 0.75rem;
                 font-weight: 500;
-                letter-spacing: 1.5px;
+                letter-spacing: 1px;
                 text-transform: uppercase;
-                color: #5a5a6a;
+                color: #a0aec0;
+                margin-bottom: 0.25rem;
             }
-            .divider {
-                height: 1px;
-                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-                margin: 16px 0;
+            .pro-card {
+                background: rgba(26, 32, 44, 0.9);
+                border: 1px solid rgba(74, 85, 104, 0.25);
+                border-radius: 12px;
+                padding: 1.5rem;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
             }
-            /* Dropdown Styling for Dark Theme */
-            .Select-control { background: #222 !important; border-color: #333 !important; }
-            .Select-value-label, .Select-placeholder, .Select-input input { color: #fff !important; }
-            .Select-menu-outer { background: #222 !important; border-color: #333 !important; }
-            .Select-option { background: #222 !important; color: #fff !important; }
-            .Select-option.is-focused { background: #333 !important; color: #fff !important; }
-            .Select-option:hover { background: #333 !important; color: #fff !important; }
-            .Select-arrow { border-color: #666 transparent transparent !important; }
+            /* Professional Dropdown Styling */
+            .dark-dropdown .Select-control { 
+                background: rgba(26, 32, 44, 0.9) !important; 
+                border: 1px solid rgba(74, 85, 104, 0.4) !important; 
+                color: #e2e8f0 !important; 
+                border-radius: 8px !important;
+                min-height: 42px;
+                font-size: 0.9rem;
+                font-family: 'SF Mono', Consolas, monospace;
+                font-weight: 500;
+                transition: all 0.2s ease;
+            }
+            .dark-dropdown .Select-control:hover {
+                border-color: rgba(74, 85, 104, 0.6) !important;
+                background: rgba(26, 32, 44, 0.95) !important;
+            }
+            .dark-dropdown .Select-placeholder { 
+                color: #718096 !important; 
+                font-weight: 400; 
+                font-family: 'Inter', sans-serif;
+            }
+            .dark-dropdown .Select-value-label { 
+                color: #f7fafc !important; 
+                font-weight: 500; 
+                font-family: 'SF Mono', Consolas, monospace;
+            }
+            .dark-dropdown .Select-input > input { 
+                color: #e2e8f0 !important; 
+                font-family: 'SF Mono', Consolas, monospace;
+            }
+            .dark-dropdown .Select-menu-outer { 
+                background: rgba(26, 32, 44, 0.98) !important; 
+                border: 1px solid rgba(74, 85, 104, 0.4) !important; 
+                border-radius: 8px !important;
+                backdrop-filter: blur(12px);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                max-height: 300px;
+            }
+            .dark-dropdown .Select-menu { 
+                background: transparent !important;
+                max-height: 280px;
+            }
+            .dark-dropdown .Select-option { 
+                color: #cbd5e0 !important; 
+                background: transparent !important; 
+                padding: 12px 16px !important;
+                font-size: 0.9rem;
+                font-family: 'SF Mono', Consolas, monospace;
+                font-weight: 500;
+                transition: all 0.15s ease;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .dark-dropdown .Select-option.is-focused { 
+                background: rgba(74, 85, 104, 0.2) !important; 
+                color: #f7fafc !important; 
+            }
+            .dark-dropdown .Select-option.is-selected { 
+                background: rgba(74, 85, 104, 0.3) !important; 
+                color: #ffffff !important; 
+            }
             
-            /* Modern Dash Dropdown Styling */
-            .dash-dropdown .Select-control { background: #222 !important; border-color: #333 !important; }
-            .dash-dropdown .Select-value-label, .dash-dropdown .Select-placeholder { color: #fff !important; }
-            .dash-dropdown .Select-menu-outer { background: #222 !important; border-color: #333 !important; }
-            .dash-dropdown .Select-option { background: #222 !important; color: #fff !important; padding: 8px 12px !important; }
-            .dash-dropdown .Select-option.is-focused { background: #333 !important; color: #fff !important; }
-            .dash-dropdown .Select-option:hover { background: #333 !important; color: #fff !important; }
+            /* Professional Button Styling */
+            .btn-primary {
+                background: #2d3748 !important;
+                border: none !important;
+                border-radius: 6px !important;
+                font-weight: 500 !important;
+                padding: 0.5rem 1rem !important;
+                font-size: 0.85rem !important;
+                transition: all 0.2s ease !important;
+                box-shadow: none !important;
+                color: #e2e8f0 !important;
+            }
+            .btn-primary:hover {
+                background: #4a5568 !important;
+                color: #f7fafc !important;
+            }
+            .btn-primary:active {
+                background: #1a202c !important;
+                transform: scale(0.98) !important;
+            }
+            .btn-secondary {
+                background: rgba(45, 55, 72, 0.1) !important;
+                border: 1px solid rgba(45, 55, 72, 0.2) !important;
+                color: #a0aec0 !important;
+                border-radius: 6px !important;
+                font-weight: 500 !important;
+                padding: 0.5rem 1rem !important;
+                font-size: 0.85rem !important;
+                transition: all 0.2s ease !important;
+            }
+            .btn-secondary:hover {
+                background: rgba(45, 55, 72, 0.15) !important;
+                border-color: rgba(45, 55, 72, 0.3) !important;
+                color: #e2e8f0 !important;
+            }
+            .btn-secondary:active {
+                background: rgba(45, 55, 72, 0.25) !important;
+                transform: scale(0.98) !important;
+            }
             
-            /* Newer Dash Component Styling */
-            .dash-dropdown > div > div { background: #222 !important; border-color: #333 !important; }
-            .dash-dropdown .dropdown-content { background: #222 !important; border-color: #333 !important; }
-            .dash-dropdown .dropdown-content .dropdown-item { color: #fff !important; background: #222 !important; }
-            .dash-dropdown .dropdown-content .dropdown-item:hover { background: #333 !important; color: #fff !important; }
-            
-            /* Dark Dropdown Class Styling */
-            .dark-dropdown .Select-control { background: #222 !important; border-color: #333 !important; color: #fff !important; }
-            .dark-dropdown .Select-placeholder { color: #999 !important; }
-            .dark-dropdown .Select-value-label { color: #fff !important; }
-            .dark-dropdown .Select-input > input { color: #fff !important; }
-            .dark-dropdown .Select-menu-outer { background: #222 !important; border-color: #333 !important; }
-            .dark-dropdown .Select-menu { background: #222 !important; }
-            .dark-dropdown .Select-option { color: #fff !important; background: #222 !important; }
-            .dark-dropdown .Select-option.is-focused { background: #333 !important; color: #fff !important; }
-            .dark-dropdown .Select-option.is-selected { background: #444 !important; color: #fff !important; }
-            .dark-dropdown .Select-arrow-zone { border-color: #666 transparent transparent !important; }
+            /* Professional Slider */
+            .rc-slider {
+                background: rgba(74, 85, 104, 0.3) !important;
+                border-radius: 3px !important;
+                height: 4px !important;
+            }
+            .rc-slider-track {
+                background: #4a5568 !important;
+                border-radius: 3px !important;
+                height: 4px !important;
+            }
+            .rc-slider-handle {
+                background: #e2e8f0 !important;
+                border: 2px solid #4a5568 !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+                width: 18px !important;
+                height: 18px !important;
+                margin-top: -7px !important;
+            }
+            .rc-slider-mark-text {
+                color: #a0aec0 !important;
+                font-size: 0.75rem !important;
+            }
         </style>
     </head>
     <body>
@@ -256,26 +381,53 @@ def fetch_team_recent_games(team_id, num_games=10):
         return []
 
 def format_game_option(game):
-    """Format game data for dropdown display"""
+    """Format game data for dropdown display - clean and professional"""
+    def shorten_team_name(name, max_len=12):
+        """Aggressively shorten team names for clean display"""
+        if len(name) <= max_len:
+            return name
+        
+        # Smart abbreviations
+        replacements = {
+            'University': 'U',
+            'College': 'C', 
+            'State': 'St',
+            'Northern': 'N',
+            'Southern': 'S',
+            'Eastern': 'E',
+            'Western': 'W',
+            'Central': 'C',
+            'International': 'Intl',
+            'Technology': 'Tech',
+            'Institute': 'Tech'
+        }
+        
+        for full, abbrev in replacements.items():
+            name = name.replace(full, abbrev)
+            if len(name) <= max_len:
+                return name
+        
+        # If still too long, truncate
+        return name[:max_len-1] + "…"
+    
+    away = shorten_team_name(game['away_team'])
+    home = shorten_team_name(game['home_team'])
+    
     if game['is_live']:
-        status = "🔴 LIVE"
-        score_display = f"{game['away_team']} {game['away_score']}-{game['home_score']} {game['home_team']}"
-        time_display = game['clock']
-        total_score = game['away_score'] + game['home_score']
+        score = f"{game['away_score']}-{game['home_score']}"
         return {
-            'label': f"{status} {score_display} ({time_display}) - Total: {total_score}",
+            'label': f"{away} {score} {home} • {game['clock']}",
             'value': game['id']
         }
     else:
-        status = "⏰ PRE"
-        score_display = f"{game['away_team']} @ {game['home_team']}"
         try:
             dt = datetime.fromisoformat(game['date'].replace('Z', '+00:00'))
-            time_display = dt.strftime('%I:%M %p ET')
+            time = dt.strftime('%I:%M%p').lower().replace('m', '')
         except:
-            time_display = game['clock']
+            time = game['clock']
+        
         return {
-            'label': f"{status} {score_display} ({time_display})",
+            'label': f"{time} {away} @ {home}",
             'value': game['id']
         }
 
@@ -314,12 +466,20 @@ def score_input(label, input_id):
 
 
 app.layout = dbc.Container([
-    html.H4("Basketball Analysis System", className="text-center py-4", style={"fontWeight": "600"}),
+    # Professional Header
+    html.Div([
+        html.H2("Da Fade Terminal", 
+                style={"fontWeight": "600", "color": "#f7fafc", "marginBottom": "0.5rem", "letterSpacing": "-0.02em"}),
+    ], className="text-center", style={"padding": "2rem 0 1.5rem 0"}),
     
+    # Professional Tabs
     dbc.Tabs([
-        dbc.Tab(label="Fade System", tab_id="fade-tab"),
-        dbc.Tab(label="Game Analysis", tab_id="analysis-tab"),
-    ], id="main-tabs", active_tab="fade-tab", className="mb-4"),
+        dbc.Tab(label="Live Analysis", tab_id="fade-tab", 
+                style={"fontSize": "0.9rem", "fontWeight": "500"}),
+        dbc.Tab(label="Research", tab_id="analysis-tab",
+                style={"fontSize": "0.9rem", "fontWeight": "500"}),
+    ], id="main-tabs", active_tab="fade-tab", className="mb-4",
+       style={"borderBottom": "1px solid rgba(63, 63, 70, 0.3)"}),
     
     html.Div(id="tab-content"),
     
@@ -331,7 +491,7 @@ app.layout = dbc.Container([
     dcc.Store(id="tomorrow_games_data", data=[]),
     dcc.Store(id="week_games_data", data=[]),
     dcc.Interval(id="refresh_games", interval=15*1000, n_intervals=0)  # Refresh every 15 seconds
-], fluid=True, style={"maxWidth": "1200px"})
+], fluid=True, style={"maxWidth": "1400px", "padding": "0 2rem"})
 
 
 def create_fade_tab():
@@ -340,7 +500,6 @@ def create_fade_tab():
         # Inputs
         dbc.Col([
             html.Div([
-                dbc.CardBody([
                     dbc.Row([
                         dbc.Col([
                             html.Div("League", className="label"),
@@ -404,12 +563,12 @@ def create_fade_tab():
                         dcc.Slider(id="threshold_slider", min=2.5, max=6, step=0.25, value=4.0,
                                    marks={2.5: '2.5', 4: '4', 6: '6'})
                     ])
-                ])
-            ], className="card")
+            ], className="pro-card")
         ], lg=4, md=5),
-        
-        # Output
-        dbc.Col([html.Div(id="output")], lg=8, md=7)
+        dbc.Col([
+            html.Div(id="output"),
+            html.Div(id="team_context_display", className="mt-3")  
+        ], lg=8, md=7)
     ])
 
 def create_analysis_tab():
@@ -694,46 +853,49 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
         ], className="mt-3")
 
     return html.Div([
-        dbc.CardBody([
-            # Signal header
             html.Div([
+            # Professional Signal Header
                 html.Div([
-                    html.Span(signal, style={"fontSize": "1.5rem", "fontWeight": "600", "color": signal_color}),
-                ]),
                 html.Div([
-                    html.Span(f"U{r['live_total']}" if pct >= 10 and over_thresh else "—", style={
-                        "fontSize": "1rem",
-                        "color": "#a1a1aa" if pct >= 10 else "#52525b",
-                        "fontWeight": "500"
-                    }),
-                ], className="mt-1")
+                    html.H3(signal, style={"fontSize": "1.8rem", "fontWeight": "700", "color": signal_color, "margin": "0", "lineHeight": "1"}),
+                    html.P(f"U{r['live_total']}" if pct >= 10 and over_thresh else "Monitor", 
+                           style={"fontSize": "0.9rem", "color": "#a1a1aa", "margin": "0.5rem 0 0 0", "fontWeight": "500"})
+                ])
             ], style={
                 "textAlign": "center",
-                "padding": "20px",
-                "marginBottom": "8px",
-                "borderRadius": "12px",
-                "border": f"1px solid {border_color}",
-                "background": "#18181b"
+                "padding": "1.5rem",
+                "marginBottom": "1.5rem",
+                "borderRadius": "16px",
+                "background": f"linear-gradient(135deg, {signal_color}15, {signal_color}08)",
+                "border": f"1px solid {signal_color}30"
             }),
             
-            # Metrics row
+            # Clean Metrics Grid
             dbc.Row([
                 dbc.Col([
-                    html.Span("SCORED", className="metric-label"),
-                    html.Div(f"{r['total']}", className="metric-value", style={"color": "#e0e0e0"})
-                ], className="text-center"),
+                    html.Div([
+                        html.Div("Current Score", className="metric-label"),
+                        html.Div(f"{r['total']}", style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#f4f4f5", "lineHeight": "1"})
+                    ])
+                ], className="text-center", width=3),
                 dbc.Col([
-                    html.Span("NEEDED", className="metric-label"),
-                    html.Div(f"{r['needed']}", className="metric-value", style={"color": "#f59e0b"})
-                ], className="text-center"),
+                    html.Div([
+                        html.Div("Points Needed", className="metric-label"),
+                        html.Div(f"{r['needed']}", style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
+                    ])
+                ], className="text-center", width=3),
                 dbc.Col([
-                    html.Span("CURR PACE", className="metric-label"),
-                    html.Div(f"{curr}", className="metric-value", style={"color": "#3b82f6"})
-                ], className="text-center"),
+                    html.Div([
+                        html.Div("Current Pace", className="metric-label"),
+                        html.Div(f"{curr:.1f}", style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"})
+                    ])
+                ], className="text-center", width=3),
                 dbc.Col([
-                    html.Span("REQ PACE", className="metric-label"),
-                    html.Div(f"{req}", className="metric-value", style={"color": signal_color})
-                ], className="text-center"),
+                    html.Div([
+                        html.Div("Required Pace", className="metric-label"),
+                        html.Div(f"{req:.1f}", style={"fontSize": "1.6rem", "fontWeight": "700", "color": signal_color, "lineHeight": "1"})
+                    ])
+                ], className="text-center", width=3),
             ], className="mb-4"),
             
             # Time
@@ -748,8 +910,178 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
             
             # Position tracker
             position_block if position_block else ""
+        ], className="pro-card")
+    ])
+
+@app.callback(
+    Output("team_context_display", "children"),
+    Input("live_game_selector", "value"),
+    State("live_games_data", "data"),
+    prevent_initial_call=True
+)
+def update_team_context(game_id, games_data):
+    """Show team analysis context for selected game"""
+    try:
+        if not game_id or not games_data:
+            return ""
+        
+        # Find the selected game
+        selected_game = None
+        for game in games_data:
+            if str(game['id']) == str(game_id):
+                selected_game = game
+                break
+        
+        if not selected_game:
+            return ""
+        
+        # Get team IDs - handle both formats
+        home_team_id = selected_game.get('home_team_id') or selected_game.get('competitors', [{}])[0].get('team', {}).get('id')
+        away_team_id = selected_game.get('away_team_id') or selected_game.get('competitors', [{}])[1].get('team', {}).get('id') if len(selected_game.get('competitors', [])) > 1 else None
+        home_team_name = selected_game.get('home_team')
+        away_team_name = selected_game.get('away_team')
+        
+        if not home_team_id or not away_team_id:
+            # Show basic game info even without team IDs for analysis
+            return html.Div([
+                html.Div([
+                    html.H5("Matchup Selected", style={"color": "#e2e8f0", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
+                    html.P(f"{away_team_name or 'Away Team'} @ {home_team_name or 'Home Team'}", 
+                           style={"color": "#a0aec0", "fontSize": "0.9rem", "margin": "0.5rem 0"}),
+                    html.P("Historical analysis requires ESPN team data", 
+                           style={"color": "#718096", "fontSize": "0.8rem", "margin": "1rem 0 0 0"})
+                ], className="pro-card")
+            ])
+        
+        # Get team stats with error handling
+        home_stats = get_team_stats(home_team_id, 10)
+        away_stats = get_team_stats(away_team_id, 10)
+        
+        if not home_stats or not away_stats:
+            return html.Div([
+                html.Div([
+                    html.H5("Team Analysis", style={"color": "#f4f4f5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
+                    html.P(f"{away_team_name} @ {home_team_name}", style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0.5rem 0"}),
+                    html.P("Historical data unavailable", style={"color": "#71717a", "fontSize": "0.85rem", "margin": "1rem 0 0 0"})
+                ], className="pro-card")
+            ])
+    
+    except Exception as e:
+        print(f"Error in team context callback: {e}")
+        return html.Div([
+            html.Div([
+                html.H5("Analysis Error", style={"color": "#f87171", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
+                html.P("Unable to load team analysis", style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0.5rem 0 0 0"})
+            ], className="pro-card")
         ])
-    ], className="output-card", style={"border": f"1px solid {border_color}"})
+    
+    # Calculate implied total
+    implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
+    
+    return html.Div([
+        html.Div([
+            # Clean Header
+            html.Div([
+                html.H5("Matchup Intelligence", 
+                       style={"color": "#f4f4f5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
+                html.P(f"{away_team_name} @ {home_team_name}", 
+                      style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0"})
+            ], style={"marginBottom": "1.5rem"}),
+            
+            # Key Metrics Row
+            dbc.Row([
+                dbc.Col([
+                    html.Div([
+                        html.Div("Projected Total", className="metric-label"),
+                        html.Div(f"{implied_total:.1f}", 
+                                style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
+                    ])
+                ], className="text-center", width=6),
+                dbc.Col([
+                    html.Div([
+                        html.Div("Avg Scoring", className="metric-label"),
+                        html.Div(f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}", 
+                                style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#d4d4d8", "lineHeight": "1"})
+                    ])
+                ], className="text-center", width=6),
+            ], className="mb-4"),
+            
+            # Team Cards
+            dbc.Row([
+                # Away Team
+                dbc.Col([
+                    html.Div([
+                        html.Div([
+                            html.H6(away_team_name[:18] + "..." if len(away_team_name) > 18 else away_team_name, 
+                                   style={"color": "#60a5fa", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
+                            html.Div(f"{away_stats['avg_team_score']:.1f}", 
+                                    style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"}),
+                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.75rem"}),
+                            
+                            html.Div([
+                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
+                                html.Span(f"{away_stats['avg_opp_score']:.1f}", 
+                                         style={"fontSize": "0.75rem", "color": "#f87171", "fontWeight": "500"})
+                            ], className="mb-1"),
+                            
+                            html.Div([
+                                html.Span("Road: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
+                                html.Span(f"{away_stats['away_avg']:.1f}" if away_stats['away_games'] > 0 else "N/A", 
+                                         style={"fontSize": "0.75rem", "color": "#d4d4d8", "fontWeight": "500"})
+                            ])
+                        ])
+                    ], style={
+                        "background": "rgba(96, 165, 250, 0.05)",
+                        "border": "1px solid rgba(96, 165, 250, 0.2)",
+                        "borderRadius": "12px",
+                        "padding": "1rem"
+                    })
+                ], width=5),
+                
+                # VS Separator
+                dbc.Col([
+                    html.Div("VS", 
+                            style={
+                                "textAlign": "center", 
+                                "fontSize": "0.8rem", 
+                                "color": "#71717a", 
+                                "fontWeight": "600",
+                                "paddingTop": "2rem"
+                            })
+                ], width=2),
+                
+                # Home Team
+                dbc.Col([
+                    html.Div([
+                        html.Div([
+                            html.H6(home_team_name[:18] + "..." if len(home_team_name) > 18 else home_team_name,
+                                   style={"color": "#34d399", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
+                            html.Div(f"{home_stats['avg_team_score']:.1f}", 
+                                    style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#34d399", "lineHeight": "1"}),
+                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.75rem"}),
+                            
+                            html.Div([
+                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
+                                html.Span(f"{home_stats['avg_opp_score']:.1f}", 
+                                         style={"fontSize": "0.75rem", "color": "#f87171", "fontWeight": "500"})
+                            ], className="mb-1"),
+                            
+                            html.Div([
+                                html.Span("Home: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
+                                html.Span(f"{home_stats['home_avg']:.1f}" if home_stats['home_games'] > 0 else "N/A", 
+                                         style={"fontSize": "0.75rem", "color": "#d4d4d8", "fontWeight": "500"})
+                            ])
+                        ])
+                    ], style={
+                        "background": "rgba(52, 211, 153, 0.05)",
+                        "border": "1px solid rgba(52, 211, 153, 0.2)",
+                        "borderRadius": "12px",
+                        "padding": "1rem"
+                    })
+                ], width=5),
+            ])
+        ], className="pro-card")
+    ])
 
 # Analysis Tab Callbacks
 @app.callback(
@@ -868,35 +1200,41 @@ def create_game_card(game):
 
 def get_team_stats(team_id, num_games=10):
     """Helper function to get team statistics"""
-    if not team_id:
+    try:
+        if not team_id:
+            return None
+        
+        recent_games = fetch_team_recent_games(team_id, num_games)
+        if not recent_games:
+            print(f"No recent games found for team {team_id}")
+            return None
+        
+        # Calculate averages
+        avg_team_score = sum(g['team_score'] for g in recent_games) / len(recent_games)
+        avg_opp_score = sum(g['opponent_score'] for g in recent_games) / len(recent_games)
+        avg_total = sum(g['total_points'] for g in recent_games) / len(recent_games)
+        
+        # Calculate additional stats
+        home_games = [g for g in recent_games if g.get('location') == 'Home']
+        away_games = [g for g in recent_games if g.get('location') == 'Away']
+        
+        home_avg = sum(g['team_score'] for g in home_games) / len(home_games) if home_games else 0
+        away_avg = sum(g['team_score'] for g in away_games) / len(away_games) if away_games else 0
+        
+        return {
+            'recent_games': recent_games,
+            'avg_team_score': avg_team_score,
+            'avg_opp_score': avg_opp_score,
+            'avg_total': avg_total,
+            'home_avg': home_avg,
+            'away_avg': away_avg,
+            'home_games': len(home_games),
+            'away_games': len(away_games)
+        }
+        
+    except Exception as e:
+        print(f"Error in get_team_stats for team {team_id}: {e}")
         return None
-    
-    recent_games = fetch_team_recent_games(team_id, num_games)
-    if not recent_games:
-        return None
-    
-    # Calculate averages
-    avg_team_score = sum(g['team_score'] for g in recent_games) / len(recent_games)
-    avg_opp_score = sum(g['opponent_score'] for g in recent_games) / len(recent_games)
-    avg_total = sum(g['total_points'] for g in recent_games) / len(recent_games)
-    
-    # Calculate additional stats
-    home_games = [g for g in recent_games if g.get('location') == 'Home']
-    away_games = [g for g in recent_games if g.get('location') == 'Away']
-    
-    home_avg = sum(g['team_score'] for g in home_games) / len(home_games) if home_games else 0
-    away_avg = sum(g['team_score'] for g in away_games) / len(away_games) if away_games else 0
-    
-    return {
-        'recent_games': recent_games,
-        'avg_team_score': avg_team_score,
-        'avg_opp_score': avg_opp_score,
-        'avg_total': avg_total,
-        'home_avg': home_avg,
-        'away_avg': away_avg,
-        'home_games': len(home_games),
-        'away_games': len(away_games)
-    }
 
 def get_team_name_from_options(team_id, team_options):
     """Helper function to get team name from dropdown options"""
