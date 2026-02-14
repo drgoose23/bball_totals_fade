@@ -757,7 +757,13 @@ def create_analysis_tab():
                 
                 html.Div(id="team-analysis-display", className="card", style={"minHeight": "400px"})
             ], width=6)
-        ])
+        ]),
+        
+        # Hidden button for callback compatibility
+        html.Button(
+            id="game_selector_button",
+            style={"display": "none"}
+        )
     ])
 
 @app.callback(
@@ -830,19 +836,28 @@ def refresh_all_games(n):
     [Input("game_selector_button", "n_clicks"),
      Input("game_modal_close", "n_clicks"),
      Input({"type": "game-card", "index": ALL}, "n_clicks")],
-    [State("game_selection_modal", "is_open")],
+    [State("game_selection_modal", "is_open"),
+     State("main-tabs", "active_tab")],
     prevent_initial_call=True
 )
-def toggle_game_modal(open_clicks, close_clicks, game_clicks, is_open):
+def toggle_game_modal(open_clicks, close_clicks, game_clicks, is_open, active_tab):
     """Open/close game selection modal"""
-    # Only open when button is explicitly clicked
-    if ctx.triggered_id == "game_selector_button" and open_clicks:
-        return True
-    # Close when cancel clicked or any game card clicked
-    elif ctx.triggered_id == "game_modal_close" or (game_clicks and any(game_clicks)):
+    try:
+        # Only process if we're on the fade tab (where the button exists)
+        if active_tab != "fade-tab":
+            return False
+            
+        # Only open when button is explicitly clicked
+        if ctx.triggered_id == "game_selector_button" and open_clicks:
+            return True
+        # Close when cancel clicked or any game card clicked
+        elif ctx.triggered_id == "game_modal_close" or (game_clicks and any(game_clicks)):
+            return False
+        # Default to closed state
         return False
-    # Default to closed state
-    return False
+    except Exception:
+        # Graceful fallback for any callback issues
+        return False
 
 @app.callback(
     Output("game_selection_grid", "children"),
@@ -1242,20 +1257,11 @@ def update_team_context(selected_game_data, games_count):
                     html.P("Historical data unavailable", style={"color": "#71717a", "fontSize": "0.85rem", "margin": "1rem 0 0 0"})
                 ], className="pro-card")
             ]), {"display": "block"}
-    
-    except Exception as e:
-        print(f"Error in team context callback: {e}")
+        
+        # Calculate implied total
+        implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
+        
         return html.Div([
-            html.Div([
-                html.H5("Analysis Error", style={"color": "#f87171", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
-                html.P("Unable to load team analysis", style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0.5rem 0 0 0"})
-            ], className="pro-card")
-        ]), {"display": "none"}
-    
-    # Calculate implied total
-    implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
-    
-    return html.Div([
         html.Div([
             # Clean Header
             html.Div([
@@ -1359,6 +1365,15 @@ def update_team_context(selected_game_data, games_count):
             ])
         ], className="pro-card")
     ]), {"display": "block"}
+    
+    except Exception as e:
+        print(f"Error in team context callback: {e}")
+        return html.Div([
+            html.Div([
+                html.H5("Analysis Error", style={"color": "#f87171", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
+                html.P("Unable to load team analysis", style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0.5rem 0 0 0"})
+            ], className="pro-card")
+        ]), {"display": "block"}
 
 # Analysis Tab Callbacks
 @app.callback(
@@ -1714,7 +1729,7 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
             
             # Recent games for this team (show last 5 for compact display)
             html.Div([
-                html.Span(f"Recent Games ({len(team_stats['recent_games'][-5:])})", 
+                html.Span(f"Recent Games ({len(team_stats['recent_games'])})", 
                          style={"fontSize": "0.85rem", "color": "#e5e5e5", "fontWeight": "500"}),
                 html.Div([
                     html.Div([
@@ -1739,8 +1754,14 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                         "border": "1px solid #2a2a2a",
                         "borderRadius": "4px",
                         "background": "#1a1a1a"
-                    }) for game in team_stats['recent_games'][-5:]
-                ], className="mt-2")
+                    }) for game in team_stats['recent_games']
+                ], className="mt-2", style={
+                    "maxHeight": "200px", 
+                    "overflowY": "auto",
+                    "border": "1px solid rgba(74, 85, 104, 0.2)",
+                    "borderRadius": "6px",
+                    "padding": "4px"
+                })
             ])
         ])
     
