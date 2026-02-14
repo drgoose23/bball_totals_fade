@@ -4,7 +4,9 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import requests
 from datetime import datetime, timedelta, timezone
-import json
+
+ODDS_API_KEY = 'c352f4d244a2a3ae32f32136f8d908ac'
+ODDS_BASE_URL = 'https://api.the-odds-api.com/v4'
 
 app = dash.Dash(__name__, external_stylesheets=[
     dbc.themes.BOOTSTRAP,
@@ -17,12 +19,6 @@ def convert_utc_to_est(utc_time_str):
         # Parse UTC time from ESPN API
         dt_utc = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
         
-        # Convert to Eastern Time (automatically handles EST/EDT based on date)
-        # During standard time: UTC-5 (EST)
-        # During daylight time: UTC-4 (EDT)
-        
-        # Simple DST check: 2nd Sunday in March to 1st Sunday in November
-        # For basketball season (Nov-April), mostly EST except March games
         year = dt_utc.year
         
         # Approximate DST dates (this covers most cases accurately)
@@ -343,7 +339,66 @@ app.index_string = '''
             .team-logo[src=""], .team-logo:not([src]) {
                 display: none;
             }
+            
+            /* Game Search Input */
+            #game_search_input.form-control {
+                /* Prevent event bubbling that might close modal */
+                z-index: 1050 !important;
+                position: relative !important;
+            }
+            
+            #game_search_input.form-control:focus {
+                border-color: #4fd1c7 !important;
+                box-shadow: 0 0 0 2px rgba(79, 209, 199, 0.2) !important;
+                z-index: 1051 !important;
+            }
+            
+            #game_search_input.form-control::placeholder {
+                color: #718096 !important;
+                font-style: italic;
+            }
+            
+            /* Prevent modal from closing when clicking in search area */
+            .modal-body {
+                position: relative;
+                z-index: 1040;
+            }
         </style>
+        <script>
+            // Prevent modal from closing when interacting with search input
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('Setting up search input protection...');
+                
+                // Add event listeners to prevent modal close on search input interaction
+                document.addEventListener('click', function(e) {
+                    if (e.target && (e.target.id === 'game_search_input' || e.target.id === 'clear_search_btn')) {
+                        console.log('Preventing click propagation for search elements');
+                        e.stopPropagation();
+                    }
+                });
+                
+                document.addEventListener('keydown', function(e) {
+                    if (e.target && e.target.id === 'game_search_input') {
+                        console.log('Preventing keydown propagation for search input');
+                        e.stopPropagation();
+                    }
+                });
+                
+                document.addEventListener('input', function(e) {
+                    if (e.target && e.target.id === 'game_search_input') {
+                        console.log('Search input changed:', e.target.value);
+                        e.stopPropagation();
+                    }
+                });
+                
+                document.addEventListener('focus', function(e) {
+                    if (e.target && e.target.id === 'game_search_input') {
+                        console.log('Search input focused');
+                        e.stopPropagation();
+                    }
+                });
+            });
+        </script>
     </head>
     <body>
         {%app_entry%}
@@ -393,11 +448,12 @@ def fetch_games_by_date(date_str=None):
     """Fetch college basketball games from ESPN's internal API for a specific date"""
     try:
         if date_str:
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}"
+            # Add parameters to get more comprehensive data
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}&limit=300"
         else:
             # For "today", use current date regardless of time - college games often span midnight
             today_str = datetime.now().strftime('%Y%m%d')
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={today_str}"
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={today_str}&limit=300"
         
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -453,10 +509,21 @@ def fetch_games_by_date(date_str=None):
             if game_info['is_live']:
                 try:
                     clock = game_info['clock']
+                    period = game_info['period']
                     if ':' in clock:
                         mins, secs = clock.split(':')
-                        game_info['minutes_left'] = int(mins)
-                        game_info['seconds_left'] = int(secs)
+                        minutes_left = int(mins)
+                        seconds_left = int(secs.split('.')[0])  # Remove decimals
+                        
+                        # Automatically convert first half time to full game time remaining
+                        if period == 1:  # First half
+                            original_mins = minutes_left
+                            minutes_left += 20  # Add 20 for entire second half
+                            print(f"DEBUG: First half auto-conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
+                        # If period == 2 (second half) or overtime, leave as is
+                        
+                        game_info['minutes_left'] = minutes_left
+                        game_info['seconds_left'] = seconds_left
                     else:
                         game_info['minutes_left'] = 0
                         game_info['seconds_left'] = 0
@@ -538,6 +605,72 @@ def fetch_team_recent_games(team_id, num_games=10):
     except Exception as e:
         print(f"Error fetching team games: {e}")
         return []
+
+# ===== ODDS API FUNCTIONS =====
+
+def get_basketball_odds(sport_key='basketball_ncaab'):
+    """Get odds for college basketball games"""
+    url = f"{ODDS_BASE_URL}/sports/{sport_key}/odds"
+    
+    params = {
+        'apiKey': ODDS_API_KEY,
+        'regions': 'us',  # US sportsbooks
+        'markets': 'totals',  # Just totals for now (simpler)
+        'oddsFormat': 'american',
+        'dateFormat': 'iso'
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        
+        games = response.json()
+        print(f"📊 Odds API: Found {len(games)} games with betting lines")
+        return games
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Odds API Error: {e}")
+        return []
+
+def extract_betting_totals(odds_games):
+    """Extract betting totals from odds data"""
+    betting_data = {}
+    
+    for game in odds_games:
+        # Create key from team names for matching
+        home_team = game['home_team']
+        away_team = game['away_team']
+        
+        # Extract totals from all sportsbooks
+        totals = []
+        for bookmaker in game.get('bookmakers', []):
+            for market in bookmaker.get('markets', []):
+                if market['key'] == 'totals':
+                    for outcome in market['outcomes']:
+                        if outcome['name'] == 'Over':
+                            totals.append(outcome['point'])
+        
+        if totals:
+            avg_total = sum(totals) / len(totals)
+            total_range = max(totals) - min(totals) if len(totals) > 1 else 0
+            
+            # Store with multiple possible team name combinations
+            game_keys = [
+                f"{away_team}|{home_team}",
+                f"{home_team}|{away_team}"
+            ]
+            
+            betting_info = {
+                'avg_total': avg_total,
+                'total_range': total_range,
+                'num_books': len(totals),
+                'commence_time': game['commence_time']
+            }
+            
+            for key in game_keys:
+                betting_data[key] = betting_info
+    
+    return betting_data
 
 def format_game_option(game):
     """Format game data for dropdown display - clean and professional"""
@@ -653,7 +786,8 @@ app.layout = dbc.Container([
     dcc.Store(id="today_games_data", data=[]),
     dcc.Store(id="tomorrow_games_data", data=[]),
     dcc.Store(id="week_games_data", data=[]),
-    dcc.Interval(id="refresh_games", interval=15*1000, n_intervals=0),  # Refresh every 15 seconds
+    dcc.Store(id="betting_odds_data", data={}),
+    dcc.Interval(id="refresh_games", interval=30*1000, n_intervals=0),  # Refresh every 30 seconds (less frequent to avoid search interference)
     
     # Game Selection Modal
     dbc.Modal([
@@ -661,12 +795,47 @@ app.layout = dbc.Container([
             html.H4("Select Game", style={"color": "#f7fafc", "margin": "0"}),
         ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"}),
         dbc.ModalBody([
-            html.Div(id="game_selection_grid", style={"maxHeight": "60vh", "overflowY": "auto"})
+            # Search bar
+            html.Div([
+                dbc.InputGroup([
+                    dbc.Input(
+                        id="game_search_input",
+                        placeholder="Search teams (e.g., 'Duke', 'Carolina', 'Lakers')...",
+                        type="text",
+                        autoComplete="off",
+                        style={
+                            "background": "rgba(45, 55, 72, 0.9)",
+                            "border": "1px solid rgba(74, 85, 104, 0.5)",
+                            "borderRadius": "8px 0 0 8px",
+                            "color": "#f7fafc",
+                            "fontSize": "0.9rem",
+                            "padding": "0.75rem"
+                        }
+                    ),
+                    dbc.Button(
+                        "✕",
+                        id="clear_search_btn",
+                        color="secondary",
+                        size="sm",
+                        style={
+                            "background": "rgba(74, 85, 104, 0.3)",
+                            "border": "1px solid rgba(74, 85, 104, 0.5)",
+                            "borderRadius": "0 8px 8px 0",
+                            "color": "#a0aec0",
+                            "fontSize": "0.8rem",
+                            "padding": "0.5rem",
+                            "minWidth": "40px"
+                        }
+                    )
+                ], className="mb-3")
+            ]),
+            # Games grid
+            html.Div(id="game_selection_grid", style={"maxHeight": "50vh", "overflowY": "auto"})
         ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none", "padding": "1.5rem"}),
         dbc.ModalFooter([
             dbc.Button("Cancel", id="game_modal_close", className="pro-button-secondary", size="sm")
         ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"})
-    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static")
+    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static", keyboard=False)
 ], fluid=True, style={"maxWidth": "1400px", "padding": "0 2rem"})
 
 
@@ -912,27 +1081,64 @@ def adj_scores(inc, dec, t1, t2):
     Output("today_games_data", "data"),
     Output("tomorrow_games_data", "data"),
     Output("week_games_data", "data"),
+    Output("betting_odds_data", "data"),
     Input("refresh_games", "n_intervals")
 )
 def refresh_all_games(n):
     """Fetch all games data every interval"""
-    live_games = fetch_live_games()
-    
-    # Get today's date in YYYYMMDD format
+    # Expand date ranges for more comprehensive coverage
     today = datetime.now().strftime('%Y%m%d')
     tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y%m%d')
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
     
+    # Get today's games (including yesterday's late games that might still be live)
+    yesterday_games = fetch_games_by_date(yesterday)
     today_games = fetch_games_by_date(today)
     tomorrow_games = fetch_games_by_date(tomorrow)
     
-    # Get week's games (next 7 days)
+    # Combine all current/live games from multiple days for more options
+    all_current_games = yesterday_games + today_games + tomorrow_games
+    
+    # Also get games from the next few days to include busy game days
+    for days_ahead in range(2, 7):  # Days 2-6 ahead (Tuesday through Saturday)
+        future_date = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
+        future_games = fetch_games_by_date(future_date)
+        all_current_games.extend(future_games)
+    
+    # Show live games + upcoming games from all fetched days (not just today)
+    live_games = [g for g in all_current_games if g['state'] in ['in', 'pre']]
+    
+    # Get extended week's games (next 14 days for more options)
     week_games = []
-    for days_ahead in range(0, 7):
+    for days_ahead in range(-1, 14):  # Include yesterday through next 13 days
         date_str = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
         games = fetch_games_by_date(date_str)
         week_games.extend(games)
     
-    return live_games, today_games, tomorrow_games, week_games
+    # Remove duplicates based on game ID
+    seen_ids = set()
+    unique_week_games = []
+    for game in week_games:
+        if game['id'] not in seen_ids:
+            unique_week_games.append(game)
+            seen_ids.add(game['id'])
+    
+    # Fetch betting odds
+    try:
+        odds_games = get_basketball_odds()
+        betting_data = extract_betting_totals(odds_games)
+        print(f"📊 Game Summary:")
+        print(f"   Yesterday: {len(yesterday_games)} games")
+        print(f"   Today: {len(today_games)} games") 
+        print(f"   Tomorrow: {len(tomorrow_games)} games")
+        print(f"   Live/Upcoming: {len(live_games)} games (across all days)")
+        print(f"   Total Week: {len(unique_week_games)} games")
+        print(f"   Betting Lines: {len(betting_data)} matched")
+    except Exception as e:
+        print(f"❌ Error fetching odds: {e}")
+        betting_data = {}
+    
+    return live_games, today_games, tomorrow_games, unique_week_games, betting_data
 
 # Modal Callbacks
 @app.callback(
@@ -950,30 +1156,72 @@ def toggle_game_modal(open_clicks, close_clicks, game_clicks, is_open, active_ta
         # Only process if we're on the fade tab (where the button exists)
         if active_tab != "fade-tab":
             return False
+        
+        # Get the component that triggered this callback
+        triggered_id = ctx.triggered_id
+        print(f"DEBUG: Modal callback triggered by: {triggered_id}")
             
         # Only open when button is explicitly clicked
-        if ctx.triggered_id == "game_selector_button" and open_clicks:
+        if triggered_id == "game_selector_button" and open_clicks:
+            print("DEBUG: Opening modal")
             return True
-        # Close when cancel clicked or any game card clicked
-        elif ctx.triggered_id == "game_modal_close" or (game_clicks and any(game_clicks)):
+        # Close when cancel clicked
+        elif triggered_id == "game_modal_close" and close_clicks:
+            print("DEBUG: Closing modal - cancel button")
             return False
-        # Default to closed state
-        return False
-    except Exception:
-        # Graceful fallback for any callback issues
-        return False
+        # Close when game card clicked
+        elif triggered_id and "game-card" in str(triggered_id) and game_clicks and any(game_clicks):
+            print("DEBUG: Closing modal - game selected")
+            return False
+        # Stay in current state for any other triggers
+        else:
+            print(f"DEBUG: Keeping modal state: {is_open}")
+            return is_open
+    except Exception as e:
+        print(f"DEBUG: Modal callback error: {e}")
+        # Graceful fallback - maintain current state
+        return is_open if is_open is not None else False
+
+@app.callback(
+    Output("game_search_input", "value", allow_duplicate=True),
+    Input("clear_search_btn", "n_clicks"),
+    prevent_initial_call=True
+)
+def clear_search_input(n_clicks):
+    """Clear search input when X button is clicked"""
+    if n_clicks:
+        return ""
+    raise dash.exceptions.PreventUpdate
 
 @app.callback(
     Output("game_selection_grid", "children"),
-    Input("live_games_data", "data")
+    Input("live_games_data", "data"),
+    Input("game_search_input", "value")
 )
-def populate_game_modal(games_data):
-    """Populate modal with game cards"""
+def populate_game_modal(games_data, search_term):
+    """Populate modal with game cards (with search filtering)"""
+    print(f"DEBUG: populate_game_modal called with search_term: '{search_term}', games: {len(games_data) if games_data else 0}")
+    
     if not games_data:
         return html.Div("No games available", style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
     
+    # Filter games based on search term
+    filtered_games = games_data
+    if search_term and len(search_term.strip()) > 0:
+        search_lower = search_term.lower().strip()
+        filtered_games = []
+        for game in games_data:
+            # Search in team names
+            if (search_lower in game.get('home_team', '').lower() or 
+                search_lower in game.get('away_team', '').lower()):
+                filtered_games.append(game)
+    
+    if not filtered_games:
+        search_msg = f"No games found for '{search_term}'" if search_term else "No games available"
+        return html.Div(search_msg, style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
+    
     game_cards = []
-    for i, game in enumerate(games_data):
+    for i, game in enumerate(filtered_games):
         if game['is_live']:
             time_display = html.Div([
                 html.Span("LIVE", className="live-indicator"),
@@ -1024,11 +1272,12 @@ def populate_game_modal(games_data):
     [Output("live_game_selector", "data"),
      Output("selected_game_text", "data")],
     [Input({"type": "game-card", "index": ALL}, "n_clicks")],
-    [State("live_games_data", "data")],
+    [State("live_games_data", "data"),
+     State("game_search_input", "value")],
     prevent_initial_call=True
 )
-def select_game_from_modal(game_clicks, games_data):
-    """Handle game selection from modal"""
+def select_game_from_modal(game_clicks, games_data, search_term):
+    """Handle game selection from modal (with search filtering)"""
     print(f"DEBUG: select_game_from_modal called with clicks: {game_clicks}, games_data length: {len(games_data) if games_data else 0}")
     
     # Don't reset if no clicks - this was causing the reset!
@@ -1040,6 +1289,16 @@ def select_game_from_modal(game_clicks, games_data):
         print("DEBUG: No games data - preventing update")
         raise dash.exceptions.PreventUpdate
     
+    # Apply same filtering logic as populate_game_modal
+    filtered_games = games_data
+    if search_term and len(search_term.strip()) > 0:
+        search_lower = search_term.lower().strip()
+        filtered_games = []
+        for game in games_data:
+            if (search_lower in game.get('home_team', '').lower() or 
+                search_lower in game.get('away_team', '').lower()):
+                filtered_games.append(game)
+    
     # Find which game was clicked (look for the highest click count)
     clicked_index = None
     max_clicks = 0
@@ -1048,8 +1307,8 @@ def select_game_from_modal(game_clicks, games_data):
             max_clicks = clicks
             clicked_index = i
     
-    if clicked_index is not None and clicked_index < len(games_data):
-        selected_game = games_data[clicked_index]
+    if clicked_index is not None and clicked_index < len(filtered_games):
+        selected_game = filtered_games[clicked_index]
         
         # Create display text with live score if available
         if selected_game.get('is_live'):
@@ -1105,14 +1364,13 @@ def store_selected_game(game_id, games_data):
 @app.callback(
     Output("team1", "value", allow_duplicate=True),
     Output("team2", "value", allow_duplicate=True), 
-    Output("live_total", "value", allow_duplicate=True),
     Output("mins_left", "value", allow_duplicate=True),
     Output("secs_left", "value", allow_duplicate=True),
     Input("selected_game_data", "data"),
     prevent_initial_call=True
 )
 def auto_fill_from_game(game_data):
-    """Auto-fill scores and time from selected game"""
+    """Auto-fill scores and time from selected game (but NOT live total)"""
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
@@ -1127,25 +1385,30 @@ def auto_fill_from_game(game_data):
     if game_data.get('is_live') and game_data.get('clock'):
         try:
             clock = game_data.get('clock', '0:00')
+            period = game_data.get('period', 2)  # Default to 2nd half if unknown
+            
             if ':' in clock:
                 time_parts = clock.split(':')
                 minutes_left = int(time_parts[0])
                 # Handle seconds with decimals
                 seconds_part = time_parts[1].split('.')[0]  # Remove decimal part
                 seconds_left = int(seconds_part)
+                
+                # Automatically convert first half time to full game time remaining
+                if period == 1:  # First half - add 20 minutes for entire second half
+                    original_mins = minutes_left
+                    minutes_left += 20
+                    print(f"DEBUG: First half auto-fill conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
+                # If period == 2 (second half), leave as is
         except (ValueError, IndexError):
             minutes_left = 0
             seconds_left = 0
     
-    # Calculate live total
-    live_total = home_score + away_score if (home_score and away_score) else None
-    
-    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, total:{live_total}, mins:{minutes_left}, secs:{seconds_left}")
+    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, mins:{minutes_left}, secs:{seconds_left} (live total left blank for manual entry)")
     
     return (
         home_score,
         away_score,
-        live_total,
         minutes_left,
         seconds_left
     )
@@ -1175,16 +1438,18 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
     curr = r['actual_pace']
     req = r['required_pace']
     
-    # Signal logic
+    # Signal logic - Fixed to be less restrictive for Under signals
     if pct >= 25 and over_thresh:
         signal, signal_color, border_color = "Under", "#4ade80", "#4ade8044"
-    elif pct >= 10 and over_thresh:
+    elif pct >= 5 and over_thresh:  # Lowered from 10 to 5
         signal, signal_color, border_color = "Under", "#86efac", "#86efac33"
-    elif pct >= 0 or not over_thresh:
+    elif pct >= 0 and over_thresh:  # NEW: Show Under for any positive % when over threshold
+        signal, signal_color, border_color = "Under", "#a7f3d0", "#a7f3d033"
+    elif not over_thresh:  # Required pace below threshold - Hold
         signal, signal_color, border_color = "Hold", "#71717a", "#71717a33"
-    elif pct >= -15:
+    elif pct >= -15:  # Negative percentage but not too bad - Hold
         signal, signal_color, border_color = "Hold", "#fbbf24", "#fbbf2433"
-    else:
+    else:  # Very negative percentage - Pass
         signal, signal_color, border_color = "Pass", "#f87171", "#f8717133"
 
     # Pace visualization - line chart
@@ -1329,9 +1594,10 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
      Output("analysis_controls", "style")],
     [Input("persistent_game_selection", "data"),
      Input("live_analysis_games_input", "value")],
+    [State("betting_odds_data", "data")],
     prevent_initial_call=True
 )
-def update_team_context(selected_game_data, games_count):
+def update_team_context(selected_game_data, games_count, betting_odds_data):
     """Show team analysis context for selected game"""
     try:
         if not selected_game_data:
@@ -1387,6 +1653,14 @@ def update_team_context(selected_game_data, games_count):
         implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
         implied_total_per_min = implied_total / 40
         
+        # Get betting line for this matchup
+        betting_info = None
+        if betting_odds_data:
+            # Try to match with betting data using team names
+            match_key1 = f"{away_team_name}|{home_team_name}"
+            match_key2 = f"{home_team_name}|{away_team_name}"
+            betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
+        
         return html.Div([
         html.Div([
             # Clean Header with Team Logos
@@ -1411,16 +1685,27 @@ def update_team_context(selected_game_data, games_count):
                     html.Div([
                         html.Div("Projected Total pts/min", className="metric-label"),
                         html.Div(f"{implied_total_per_min:.2f}", 
-                                style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
+                                style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
                     ])
-                ], className="text-center", width=6),
+                ], className="text-center", width=4),
                 dbc.Col([
                     html.Div([
-                        html.Div("Avg Scoring", className="metric-label"),
-                        html.Div(f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}", 
-                                style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#d4d4d8", "lineHeight": "1"})
+                        html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
+                        html.Div(f"{betting_info['avg_total']:.1f}" if betting_info else "No Line", 
+                                style={"fontSize": "1.6rem", "fontWeight": "700", 
+                                      "color": "#10d9c4" if betting_info else "#71717a", "lineHeight": "1"})
                     ])
-                ], className="text-center", width=6),
+                ], className="text-center", width=4),
+                dbc.Col([
+                    html.Div([
+                        html.Div("Line pts/min" if betting_info else "Avg Scoring", className="metric-label"),
+                        html.Div(
+                            f"{(betting_info['avg_total'] / 40):.2f}" if betting_info 
+                            else f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}",
+                            style={"fontSize": "1.6rem" if betting_info else "1.2rem", "fontWeight": "700" if betting_info else "600", 
+                                   "color": "#10d9c4" if betting_info else "#d4d4d8", "lineHeight": "1"})
+                    ])
+                ], className="text-center", width=4),
             ], className="mb-4"),
             
             # Team Cards
@@ -1548,9 +1833,10 @@ def update_team_context(selected_game_data, games_count):
     State("today_games_data", "data"),
     State("tomorrow_games_data", "data"),
     State("week_games_data", "data"),
+    State("betting_odds_data", "data"),
     prevent_initial_call=True
 )
-def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab, today_games, tomorrow_games, week_games):
+def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab, today_games, tomorrow_games, week_games, betting_odds_data):
     """Update games display and button states based on selection or auto-load Today when tab opens"""
     ctx_triggered = ctx.triggered[0]['prop_id'] if ctx.triggered else ''
     
@@ -1590,7 +1876,7 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab,
             ], className="mb-3"),
             
             html.Div([
-                create_game_card(game) for game in games_to_show
+                create_game_card(game, betting_odds_data) for game in games_to_show
             ], style={"maxHeight": "500px", "overflowY": "auto"})  # Add scroll for many games
         ])
         
@@ -1654,7 +1940,7 @@ def populate_teams_from_game_click(game_clicks, today_games, tomorrow_games, wee
     
     return away_team_id, home_team_id  # Team 1 = Away, Team 2 = Home
 
-def create_game_card(game):
+def create_game_card(game, betting_odds_data=None):
     """Create a clickable card for displaying game information"""
     status_color = "#4ade80" if game['is_live'] else "#71717a" if game['state'] == 'pre' else "#f87171"
     status_text = "LIVE" if game['is_live'] else "UPCOMING" if game['state'] == 'pre' else "FINAL"
@@ -1668,6 +1954,21 @@ def create_game_card(game):
     else:
         score_display = "@"  # Use @ for upcoming games
         total_score = None
+    
+    # Get betting total from odds data
+    betting_total = None
+    if betting_odds_data:
+        # Try to match with betting data using the correct key format
+        away_team = game.get('away_team', '')
+        home_team = game.get('home_team', '')
+        
+        # Try both possible key combinations  
+        game_key1 = f"{away_team}|{home_team}"
+        game_key2 = f"{home_team}|{away_team}"
+        
+        betting_info = betting_odds_data.get(game_key1) or betting_odds_data.get(game_key2)
+        if betting_info:
+            betting_total = betting_info.get('avg_total')
     
     # Parse game time for upcoming games
     time_display = game['clock']
@@ -1713,9 +2014,9 @@ def create_game_card(game):
             ], width=7),
             dbc.Col([
                 html.Div([
-                    html.Span("Total: ", style={"fontSize": "0.7rem", "color": "#666"}),
-                    html.Span(str(total_score) if total_score is not None else "—", 
-                             style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#f59e0b"})
+                    html.Span("Line: " if betting_total else "Total: ", style={"fontSize": "0.7rem", "color": "#666"}),
+                    html.Span(str(betting_total) if betting_total else (str(total_score) if total_score is not None else "—"), 
+                             style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#10d9c4" if betting_total else "#f59e0b"})
                 ], className="text-right")
             ], width=5)
         ])
@@ -1803,9 +2104,10 @@ def update_games_count_display(games_count):
     Input("team2_selector", "value"),
     Input("games_count_input", "value"),
     State("team1_selector", "options"),
-    State("team2_selector", "options")
+    State("team2_selector", "options"),
+    State("betting_odds_data", "data")
 )
-def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options):
+def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options, betting_odds_data):
     """Update team comparison analysis display"""
     if not team1_id and not team2_id:
         return dbc.CardBody([
@@ -1847,13 +2149,35 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
         implied_total = team1_stats['avg_team_score'] + team2_stats['avg_team_score']
         implied_total_per_min = implied_total / 40
         
+        # Get betting line for this matchup
+        betting_info = None
+        if betting_odds_data and team1_name and team2_name:
+            # Try both possible key combinations
+            match_key1 = f"{team1_name}|{team2_name}"
+            match_key2 = f"{team2_name}|{team1_name}"
+            betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
+        
         comparison_content.extend([
             html.Div([
                 html.H6("Team Comparison", style={"color": "#e5e5e5", "textAlign": "center"}),
-                html.Div([
-                    html.Span("Implied Total pts/min: ", style={"fontSize": "0.9rem", "color": "#666"}),
-                    html.Span(f"{implied_total_per_min:.2f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
-                ], className="text-center mb-4")
+                
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.Div("Projected Total pts/min", className="metric-label"),
+                            html.Div(f"{implied_total_per_min:.2f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
+                        ])
+                    ], className="text-center", width=6),
+                    dbc.Col([
+                        html.Div([
+                            html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
+                            html.Div(
+                                f"{betting_info['avg_total']:.1f} ({betting_info['avg_total'] / 40:.2f} pts/min)" if betting_info else "No Line", 
+                                style={"fontSize": "1.4rem", "fontWeight": "700", 
+                                       "color": "#10d9c4" if betting_info else "#71717a"})
+                        ])
+                    ], className="text-center", width=6),
+                ], className="mb-4")
             ]),
             
             dbc.Row([
