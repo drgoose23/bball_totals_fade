@@ -231,6 +231,56 @@ app.index_string = '''
                 color: #a0aec0 !important;
                 font-size: 0.75rem !important;
             }
+            
+            /* Game Selection Modal */
+            .game-selector-btn:hover {
+                background: rgba(26, 32, 44, 0.95) !important;
+                border-color: rgba(74, 85, 104, 0.6) !important;
+                transform: translateY(-1px);
+            }
+            
+            .game-card {
+                background: rgba(26, 32, 44, 0.6);
+                border: 1px solid rgba(74, 85, 104, 0.3);
+                border-radius: 8px;
+                padding: 1rem;
+                margin: 0.5rem 0;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                font-family: 'SF Mono', Consolas, monospace;
+            }
+            
+            .game-card:hover {
+                background: rgba(74, 85, 104, 0.2);
+                border-color: rgba(74, 85, 104, 0.5);
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            }
+            
+            .game-time {
+                color: #68d391;
+                font-weight: 600;
+                font-size: 0.9rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .game-matchup {
+                color: #e2e8f0;
+                font-weight: 500;
+                font-size: 1rem;
+                margin-bottom: 0.25rem;
+            }
+            
+            .game-details {
+                color: #a0aec0;
+                font-size: 0.8rem;
+            }
+            
+            .live-indicator {
+                color: #f56565;
+                font-weight: 600;
+                font-size: 0.8rem;
+            }
         </style>
     </head>
     <body>
@@ -468,7 +518,7 @@ def score_input(label, input_id):
 app.layout = dbc.Container([
     # Professional Header
     html.Div([
-        html.H2("Da Fade Terminal", 
+        html.H2("- CBB Fade Terminal -", 
                 style={"fontWeight": "600", "color": "#f7fafc", "marginBottom": "0.5rem", "letterSpacing": "-0.02em"}),
     ], className="text-center", style={"padding": "2rem 0 1.5rem 0"}),
     
@@ -487,10 +537,24 @@ app.layout = dbc.Container([
     dcc.Store(id="opening_line", data=None),
     dcc.Store(id="live_games_data", data=[]),
     dcc.Store(id="selected_game_data", data=None),
+    dcc.Store(id="persistent_game_selection", data=None),  # Completely separate storage for game selection
     dcc.Store(id="today_games_data", data=[]),
     dcc.Store(id="tomorrow_games_data", data=[]),
     dcc.Store(id="week_games_data", data=[]),
-    dcc.Interval(id="refresh_games", interval=15*1000, n_intervals=0)  # Refresh every 15 seconds
+    dcc.Interval(id="refresh_games", interval=15*1000, n_intervals=0),  # Refresh every 15 seconds
+    
+    # Game Selection Modal
+    dbc.Modal([
+        dbc.ModalHeader([
+            html.H4("Select Game", style={"color": "#f7fafc", "margin": "0"}),
+        ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"}),
+        dbc.ModalBody([
+            html.Div(id="game_selection_grid", style={"maxHeight": "60vh", "overflowY": "auto"})
+        ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none", "padding": "1.5rem"}),
+        dbc.ModalFooter([
+            dbc.Button("Cancel", id="game_modal_close", className="pro-button-secondary", size="sm")
+        ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"})
+    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static")
 ], fluid=True, style={"maxWidth": "1400px", "padding": "0 2rem"})
 
 
@@ -519,14 +583,29 @@ def create_fade_tab():
                             html.Span("Live Game", className="label"),
                             html.Span(" (ESPN)", style={"fontSize": "0.65rem", "color": "#555", "marginLeft": "6px"})
                         ]),
-                        dcc.Dropdown(
-                            id="live_game_selector",
-                            options=[],
-                            placeholder="Select live game or enter manually below...",
-                            clearable=True,
-                            style={"color": "#fff"},
-                            className="dark-dropdown"
+                        html.Button(
+                            id="game_selector_button",
+                            children=[
+                                html.Div("Select Game", id="game_selector_text", style={"color": "#a0aec0"}),
+                                html.Div("⌄", style={"fontSize": "1.2rem", "marginLeft": "auto"})
+                            ],
+                            className="game-selector-btn",
+                            style={
+                                "width": "100%", 
+                                "display": "flex", 
+                                "alignItems": "center",
+                                "justifyContent": "space-between",
+                                "padding": "0.75rem 1rem",
+                                "background": "rgba(26, 32, 44, 0.9)",
+                                "border": "1px solid rgba(74, 85, 104, 0.4)",
+                                "borderRadius": "8px",
+                                "cursor": "pointer",
+                                "transition": "all 0.2s ease"
+                            }
                         ),
+                        # Store selected game ID and button text separately for persistence
+                        dcc.Store(id="live_game_selector", data=None),
+                        dcc.Store(id="selected_game_text", data="Select Game"),
                     ], className="mb-4"),
                     
                     dbc.Row([
@@ -698,30 +777,148 @@ def refresh_all_games(n):
     
     return live_games, today_games, tomorrow_games, week_games
 
+# Modal Callbacks
 @app.callback(
-    Output("live_game_selector", "options"),
-    Input("live_games_data", "data")
+    Output("game_selection_modal", "is_open"),
+    [Input("game_selector_button", "n_clicks"),
+     Input("game_modal_close", "n_clicks"),
+     Input({"type": "game-card", "index": ALL}, "n_clicks")],
+    [State("game_selection_modal", "is_open")],
+    prevent_initial_call=True
 )
-def update_game_options(games_data):
-    """Update game selector options"""
-    if not games_data:
-        return []
-    return [format_game_option(game) for game in games_data]
+def toggle_game_modal(open_clicks, close_clicks, game_clicks, is_open):
+    """Open/close game selection modal"""
+    # Only open when button is explicitly clicked
+    if ctx.triggered_id == "game_selector_button" and open_clicks:
+        return True
+    # Close when cancel clicked or any game card clicked
+    elif ctx.triggered_id == "game_modal_close" or (game_clicks and any(game_clicks)):
+        return False
+    # Default to closed state
+    return False
 
 @app.callback(
-    Output("selected_game_data", "data"),
-    Input("live_game_selector", "value"),
+    Output("game_selection_grid", "children"),
+    Input("live_games_data", "data")
+)
+def populate_game_modal(games_data):
+    """Populate modal with game cards"""
+    if not games_data:
+        return html.Div("No games available", style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
+    
+    game_cards = []
+    for i, game in enumerate(games_data):
+        if game['is_live']:
+            time_display = html.Div([
+                html.Span("LIVE", className="live-indicator"),
+                html.Span(f" • {game['clock']}", style={"color": "#a0aec0", "fontSize": "0.8rem"})
+            ], className="game-time")
+            details = f"{game['away_score']}-{game['home_score']} • Total: {game['away_score'] + game['home_score']}"
+        else:
+            try:
+                dt = datetime.fromisoformat(game['date'].replace('Z', '+00:00'))
+                time_str = dt.strftime('%I:%M%p').lower().replace('m', '')
+            except:
+                time_str = game['clock']
+            time_display = html.Div(time_str, className="game-time")
+            details = "Upcoming"
+        
+        card = html.Div([
+            time_display,
+            html.Div(f"{game['away_team']} @ {game['home_team']}", className="game-matchup"),
+            html.Div(details, className="game-details")
+        ], className="game-card", id={"type": "game-card", "index": i}, n_clicks=0)
+        
+        game_cards.append(card)
+    
+    return game_cards
+
+@app.callback(
+    [Output("live_game_selector", "data"),
+     Output("selected_game_text", "data")],
+    [Input({"type": "game-card", "index": ALL}, "n_clicks")],
+    [State("live_games_data", "data")],
+    prevent_initial_call=True
+)
+def select_game_from_modal(game_clicks, games_data):
+    """Handle game selection from modal"""
+    print(f"DEBUG: select_game_from_modal called with clicks: {game_clicks}, games_data length: {len(games_data) if games_data else 0}")
+    
+    # Don't reset if no clicks - this was causing the reset!
+    if not any(game_clicks):
+        print("DEBUG: No clicks detected - preventing update to avoid reset")
+        raise dash.exceptions.PreventUpdate
+    
+    if not games_data:
+        print("DEBUG: No games data - preventing update")
+        raise dash.exceptions.PreventUpdate
+    
+    # Find which game was clicked (look for the highest click count)
+    clicked_index = None
+    max_clicks = 0
+    for i, clicks in enumerate(game_clicks):
+        if clicks and clicks > max_clicks:
+            max_clicks = clicks
+            clicked_index = i
+    
+    if clicked_index is not None and clicked_index < len(games_data):
+        selected_game = games_data[clicked_index]
+        
+        # Create display text with live score if available
+        if selected_game.get('is_live'):
+            game_text = f"{selected_game['away_team']} {selected_game['away_score']}-{selected_game['home_score']} {selected_game['home_team']}"
+        else:
+            game_text = f"{selected_game['away_team']} @ {selected_game['home_team']}"
+        
+        # Truncate if too long
+        if len(game_text) > 40:
+            game_text = game_text[:37] + "..."
+            
+        print(f"DEBUG: Selected game ID: {selected_game['id']}, Text: {game_text}")
+        return selected_game['id'], game_text
+    
+    print("DEBUG: No valid game found - preventing update")
+    raise dash.exceptions.PreventUpdate
+
+# Separate callback to update button text from persistent storage
+@app.callback(
+    Output("game_selector_text", "children"),
+    Input("selected_game_text", "data")
+)
+def update_button_text(game_text):
+    """Update button text from persistent storage"""
+    return game_text or "Select Game"
+
+# Removed legacy dropdown callback - now using modal selection only
+
+@app.callback(
+    [Output("selected_game_data", "data"),
+     Output("persistent_game_selection", "data")],
+    Input("live_game_selector", "data"),
     State("live_games_data", "data")
 )
 def store_selected_game(game_id, games_data):
-    """Store selected game data"""
+    """Store selected game data in both temporary and persistent storage"""
     if not game_id or not games_data:
-        return None
-    return next((game for game in games_data if game['id'] == game_id), None)
+        print(f"DEBUG: store_selected_game - No game_id ({game_id}) or games_data ({len(games_data) if games_data else 0} games)")
+        return None, None
+    
+    # Handle both string and int game IDs
+    selected_game = next((game for game in games_data if str(game['id']) == str(game_id)), None)
+    
+    if selected_game:
+        print(f"DEBUG: Found selected game: {selected_game['away_team']} @ {selected_game['home_team']} (ID: {selected_game['id']})")
+        # Store the same data in both places - one for form auto-fill, one for persistence
+        return selected_game, selected_game
+    else:
+        print(f"DEBUG: No game found with ID: {game_id}")
+        print(f"Available game IDs: {[game['id'] for game in games_data[:5]]}")  # Show first 5 IDs
+        return None, None
 
 @app.callback(
     Output("team1", "value", allow_duplicate=True),
     Output("team2", "value", allow_duplicate=True), 
+    Output("live_total", "value", allow_duplicate=True),
     Output("mins_left", "value", allow_duplicate=True),
     Output("secs_left", "value", allow_duplicate=True),
     Input("selected_game_data", "data"),
@@ -732,11 +929,38 @@ def auto_fill_from_game(game_data):
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
+    # Extract scores from ESPN data structure
+    home_score = game_data.get('home_score', 0)
+    away_score = game_data.get('away_score', 0)
+    
+    # Parse time from clock (e.g., "12:34" or "12:34.5")
+    minutes_left = 0
+    seconds_left = 0
+    
+    if game_data.get('is_live') and game_data.get('clock'):
+        try:
+            clock = game_data.get('clock', '0:00')
+            if ':' in clock:
+                time_parts = clock.split(':')
+                minutes_left = int(time_parts[0])
+                # Handle seconds with decimals
+                seconds_part = time_parts[1].split('.')[0]  # Remove decimal part
+                seconds_left = int(seconds_part)
+        except (ValueError, IndexError):
+            minutes_left = 0
+            seconds_left = 0
+    
+    # Calculate live total
+    live_total = home_score + away_score if (home_score and away_score) else None
+    
+    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, total:{live_total}, mins:{minutes_left}, secs:{seconds_left}")
+    
     return (
-        game_data.get('home_score', 0),
-        game_data.get('away_score', 0),
-        game_data.get('minutes_left', 0),
-        game_data.get('seconds_left', 0)
+        home_score,
+        away_score,
+        live_total,
+        minutes_left,
+        seconds_left
     )
 
 @app.callback(
@@ -915,31 +1139,20 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
 
 @app.callback(
     Output("team_context_display", "children"),
-    Input("live_game_selector", "value"),
-    State("live_games_data", "data"),
+    Input("persistent_game_selection", "data"),
     prevent_initial_call=True
 )
-def update_team_context(game_id, games_data):
+def update_team_context(selected_game_data):
     """Show team analysis context for selected game"""
     try:
-        if not game_id or not games_data:
-            return ""
-        
-        # Find the selected game
-        selected_game = None
-        for game in games_data:
-            if str(game['id']) == str(game_id):
-                selected_game = game
-                break
-        
-        if not selected_game:
+        if not selected_game_data:
             return ""
         
         # Get team IDs and names from ESPN data
-        home_team_id = selected_game.get('home_team_id')
-        away_team_id = selected_game.get('away_team_id')
-        home_team_name = selected_game.get('home_team')
-        away_team_name = selected_game.get('away_team')
+        home_team_id = selected_game_data.get('home_team_id')
+        away_team_id = selected_game_data.get('away_team_id')
+        home_team_name = selected_game_data.get('home_team')
+        away_team_name = selected_game_data.get('away_team')
         
         # Debug print (remove after testing)
         print(f"DEBUG: home_team_id={home_team_id}, away_team_id={away_team_id}")
