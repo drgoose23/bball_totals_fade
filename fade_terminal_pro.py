@@ -766,8 +766,8 @@ def create_fade_tab():
                             dbc.Input(
                                 id="live_analysis_games_input",
                                 type="text",
-                                value="10",
-                                placeholder="10",
+                                value="5",
+                                placeholder="5",
                                 style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.85rem"}
                             ),
                             dbc.InputGroupText("games", style={
@@ -838,8 +838,8 @@ def create_analysis_tab():
                                 dbc.Input(
                                     id="games_count_input",
                                     type="text",
-                                    value="10",
-                                    placeholder="10",
+                                    value="5",
+                                    placeholder="5",
                                     style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.9rem"}
                                 ),
                                 dbc.InputGroupText("games", style={
@@ -1339,13 +1339,13 @@ def update_team_context(selected_game_data, games_count):
         
         # Validate games count
         try:
-            games_count = int(games_count) if games_count else 10
+            games_count = int(games_count) if games_count else 5
             if games_count < 3:
                 games_count = 3
             elif games_count > 25:
                 games_count = 25
         except (ValueError, TypeError):
-            games_count = 10
+            games_count = 5
         
         # Get team IDs and names from ESPN data
         home_team_id = selected_game_data.get('home_team_id')
@@ -1385,6 +1385,7 @@ def update_team_context(selected_game_data, games_count):
         
         # Calculate implied total
         implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
+        implied_total_per_min = implied_total / 40
         
         return html.Div([
         html.Div([
@@ -1408,8 +1409,8 @@ def update_team_context(selected_game_data, games_count):
             dbc.Row([
                 dbc.Col([
                     html.Div([
-                        html.Div("Projected Total", className="metric-label"),
-                        html.Div(f"{implied_total:.1f}", 
+                        html.Div("Projected Total pts/min", className="metric-label"),
+                        html.Div(f"{implied_total_per_min:.2f}", 
                                 style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
                     ])
                 ], className="text-center", width=6),
@@ -1438,7 +1439,13 @@ def update_team_context(selected_game_data, games_count):
                             ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
                             html.Div(f"{away_stats['avg_team_score']:.1f}", 
                                     style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.75rem"}),
+                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.5rem"}),
+                            
+                            html.Div([
+                                html.Span(f"{away_stats['avg_points_per_minute']:.2f}", 
+                                         style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
+                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#71717a", "marginLeft": "2px"})
+                            ], className="mb-2"),
                             
                             html.Div([
                                 html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
@@ -1486,7 +1493,13 @@ def update_team_context(selected_game_data, games_count):
                             ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
                             html.Div(f"{home_stats['avg_team_score']:.1f}", 
                                     style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#34d399", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.75rem"}),
+                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.5rem"}),
+                            
+                            html.Div([
+                                html.Span(f"{home_stats['avg_points_per_minute']:.2f}", 
+                                         style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
+                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#71717a", "marginLeft": "2px"})
+                            ], className="mb-2"),
                             
                             html.Div([
                                 html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
@@ -1525,27 +1538,36 @@ def update_team_context(selected_game_data, games_count):
     Output("games-display", "children"),
     Output("team1_selector", "options"),
     Output("team2_selector", "options"),
+    Output("today-btn", "color"),
+    Output("tomorrow-btn", "color"),
+    Output("week-btn", "color"),
     Input("today-btn", "n_clicks"),
     Input("tomorrow-btn", "n_clicks"),
     Input("week-btn", "n_clicks"),
+    Input("main-tabs", "active_tab"),  # Auto-load when Research tab opens
     State("today_games_data", "data"),
     State("tomorrow_games_data", "data"),
     State("week_games_data", "data"),
     prevent_initial_call=True
 )
-def update_games_display(today_clicks, tomorrow_clicks, week_clicks, today_games, tomorrow_games, week_games):
-    """Update games display based on button selection"""
+def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab, today_games, tomorrow_games, week_games):
+    """Update games display and button states based on selection or auto-load Today when tab opens"""
     ctx_triggered = ctx.triggered[0]['prop_id'] if ctx.triggered else ''
     
+    # Determine which button should be selected and what data to show
     if 'tomorrow-btn' in ctx_triggered:
         games_to_show = tomorrow_games or []
         title = "Tomorrow's Games"
+        button_colors = ("secondary", "primary", "secondary")  # Today, Tomorrow, Week
     elif 'week-btn' in ctx_triggered:
         games_to_show = week_games or []
         title = "This Week's Games"
+        button_colors = ("secondary", "secondary", "primary")
     else:
+        # Default to Today (including when Research tab opens)
         games_to_show = today_games or []
         title = "Today's Games"
+        button_colors = ("primary", "secondary", "secondary")
     
     if not games_to_show:
         games_content = html.Div([
@@ -1553,6 +1575,12 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, today_games
                    className="text-center text-muted py-4")
         ])
         team_options = []
+        return (dbc.CardBody(games_content), 
+                team_options, 
+                team_options, 
+                button_colors[0],  # Today button color
+                button_colors[1],  # Tomorrow button color  
+                button_colors[2])  # Week button color
     else:
         games_content = html.Div([
             html.Div([
@@ -1579,7 +1607,12 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, today_games
         # Sort team options alphabetically for easier searching
         team_options.sort(key=lambda x: x['label'])
     
-    return dbc.CardBody(games_content), team_options, team_options
+    return (dbc.CardBody(games_content), 
+            team_options, 
+            team_options, 
+            button_colors[0],  # Today button color
+            button_colors[1],  # Tomorrow button color  
+            button_colors[2])  # Week button color
 
 # Auto-populate team selectors when game is clicked
 @app.callback(
@@ -1719,11 +1752,15 @@ def get_team_stats(team_id, num_games=10):
         home_avg = sum(g['team_score'] for g in home_games) / len(home_games) if home_games else 0
         away_avg = sum(g['team_score'] for g in away_games) / len(away_games) if away_games else 0
         
+        # Calculate points per minute (PPG / 40)
+        avg_points_per_minute = avg_team_score / 40
+        
         return {
             'recent_games': recent_games,
             'avg_team_score': avg_team_score,
             'avg_opp_score': avg_opp_score,
             'avg_total': avg_total,
+            'avg_points_per_minute': avg_points_per_minute,
             'home_avg': home_avg,
             'away_avg': away_avg,
             'home_games': len(home_games),
@@ -1751,13 +1788,13 @@ def get_team_name_from_options(team_id, team_options):
 def update_games_count_display(games_count):
     """Update the games count display"""
     try:
-        games_count = int(games_count) if games_count else 10
+        games_count = int(games_count) if games_count else 5
         if games_count < 3:
             games_count = 3
         elif games_count > 25:
             games_count = 25
     except (ValueError, TypeError):
-        games_count = 10
+        games_count = 5
     return f"Last {games_count} games"
 
 @app.callback(
@@ -1777,17 +1814,21 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
     
     # Validate games count from text input
     try:
-        games_count = int(games_count) if games_count else 10
+        games_count = int(games_count) if games_count else 5
         if games_count < 3:
             games_count = 3
         elif games_count > 25:
             games_count = 25
     except (ValueError, TypeError):
-        games_count = 10
+        games_count = 5
     
     # Get team names from options
     team1_name = get_team_name_from_options(team1_id, team1_options) if team1_id else None
     team2_name = get_team_name_from_options(team2_id, team2_options) if team2_id else None
+    
+    # Get team logos using ESPN fallback pattern
+    team1_logo_url = f"https://a.espncdn.com/i/teamlogos/ncaa/500/{team1_id}.png" if team1_id else ''
+    team2_logo_url = f"https://a.espncdn.com/i/teamlogos/ncaa/500/{team2_id}.png" if team2_id else ''
     
     # Get stats for both teams with specified games count
     team1_stats = get_team_stats(team1_id, games_count) if team1_id else None
@@ -1804,24 +1845,32 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
     # If both teams selected, show head-to-head comparison
     if team1_stats and team2_stats:
         implied_total = team1_stats['avg_team_score'] + team2_stats['avg_team_score']
+        implied_total_per_min = implied_total / 40
         
         comparison_content.extend([
             html.Div([
                 html.H6("Team Comparison", style={"color": "#e5e5e5", "textAlign": "center"}),
                 html.Div([
-                    html.Span("Implied Total: ", style={"fontSize": "0.9rem", "color": "#666"}),
-                    html.Span(f"{implied_total:.1f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
+                    html.Span("Implied Total pts/min: ", style={"fontSize": "0.9rem", "color": "#666"}),
+                    html.Span(f"{implied_total_per_min:.2f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
                 ], className="text-center mb-4")
             ]),
             
             dbc.Row([
                 # Team 1 Column
                 dbc.Col([
-                    html.H6(team1_name or "Team 1", className="text-center mb-3", 
-                           style={"color": "#4ade80", "fontSize": "1rem", "fontWeight": "600"}),
+                    html.Div([
+                        html.Img(src=team1_logo_url, 
+                                style={"width": "24px", "height": "24px", "marginRight": "8px", "borderRadius": "4px"},
+                                className="team-logo") if team1_logo_url else None,
+                        html.Span(team1_name or "Team 1", style={"color": "#4ade80", "fontSize": "1rem", "fontWeight": "600"})
+                    ], style={"display": "flex", "alignItems": "center", "justifyContent": "center", "marginBottom": "1rem"}),
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team1_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#4ade80", "textAlign": "center"}),
+                    html.Div("PTS/MIN", className="metric-label text-center mt-2"),
+                    html.Div(f"{team1_stats['avg_points_per_minute']:.2f}", 
+                            style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b", "textAlign": "center"}),
                     html.Div("vs OPP", className="metric-label text-center mt-2"),
                     html.Div(f"{team1_stats['avg_opp_score']:.1f}", 
                             style={"fontSize": "1.2rem", "color": "#f87171", "textAlign": "center"}),
@@ -1835,11 +1884,18 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                 
                 # Team 2 Column  
                 dbc.Col([
-                    html.H6(team2_name or "Team 2", className="text-center mb-3", 
-                           style={"color": "#3b82f6", "fontSize": "1rem", "fontWeight": "600"}),
+                    html.Div([
+                        html.Img(src=team2_logo_url, 
+                                style={"width": "24px", "height": "24px", "marginRight": "8px", "borderRadius": "4px"},
+                                className="team-logo") if team2_logo_url else None,
+                        html.Span(team2_name or "Team 2", style={"color": "#3b82f6", "fontSize": "1rem", "fontWeight": "600"})
+                    ], style={"display": "flex", "alignItems": "center", "justifyContent": "center", "marginBottom": "1rem"}),
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team2_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#3b82f6", "textAlign": "center"}),
+                    html.Div("PTS/MIN", className="metric-label text-center mt-2"),
+                    html.Div(f"{team2_stats['avg_points_per_minute']:.2f}", 
+                            style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b", "textAlign": "center"}),
                     html.Div("vs OPP", className="metric-label text-center mt-2"),
                     html.Div(f"{team2_stats['avg_opp_score']:.1f}", 
                             style={"fontSize": "1.2rem", "color": "#f87171", "textAlign": "center"}),
@@ -1853,15 +1909,15 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
     team_labels = []
     if team1_stats and team2_stats:
         team_labels = [
-            (team1_stats, "#4ade80", team1_name or "Team 1"), 
-            (team2_stats, "#3b82f6", team2_name or "Team 2")
+            (team1_stats, "#4ade80", team1_name or "Team 1", team1_logo_url), 
+            (team2_stats, "#3b82f6", team2_name or "Team 2", team2_logo_url)
         ]
     elif team1_stats:
-        team_labels = [(team1_stats, "#4ade80", team1_name or "Team Analysis")]
+        team_labels = [(team1_stats, "#4ade80", team1_name or "Team Analysis", team1_logo_url)]
     elif team2_stats:
-        team_labels = [(team2_stats, "#3b82f6", team2_name or "Team Analysis")]
+        team_labels = [(team2_stats, "#3b82f6", team2_name or "Team Analysis", team2_logo_url)]
     
-    for i, (team_stats, team_color, team_label) in enumerate(team_labels):
+    for i, (team_stats, team_color, team_label, team_logo_url) in enumerate(team_labels):
         if not team_stats:
             continue
             
@@ -1869,12 +1925,22 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
             comparison_content.append(html.Hr(style={"borderColor": "#333", "margin": "20px 0"}))
         
         comparison_content.extend([
-            html.H6(team_label, style={"color": team_color, "marginBottom": "12px"}),
+            html.Div([
+                html.Img(src=team_logo_url, 
+                        style={"width": "20px", "height": "20px", "marginRight": "8px", "borderRadius": "3px"},
+                        className="team-logo") if team_logo_url else None,
+                html.Span(team_label, style={"color": team_color, "fontSize": "1rem", "fontWeight": "600"})
+            ], style={"display": "flex", "alignItems": "center", "marginBottom": "12px"}),
             
             dbc.Row([
                 dbc.Col([
                     html.Div("TOTAL PPG", className="metric-label"),
                     html.Div(f"{team_stats['avg_total']:.1f}", 
+                            style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#f59e0b"})
+                ], className="text-center"),
+                dbc.Col([
+                    html.Div("PTS/MIN", className="metric-label"),
+                    html.Div(f"{team_stats['avg_points_per_minute']:.2f}", 
                             style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#f59e0b"})
                 ], className="text-center"),
                 dbc.Col([
