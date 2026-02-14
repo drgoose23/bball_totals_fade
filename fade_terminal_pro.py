@@ -654,6 +654,29 @@ def create_fade_tab():
         ], lg=4, md=5),
         dbc.Col([
             html.Div(id="output"),
+            html.Div([
+                dbc.Row([
+                    dbc.Col([
+                        html.Div("Analysis Depth", className="label"),
+                        dbc.InputGroup([
+                            dbc.Input(
+                                id="live_analysis_games_input",
+                                type="text",
+                                value="10",
+                                placeholder="10",
+                                style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.85rem"}
+                            ),
+                            dbc.InputGroupText("games", style={
+                                "background": "rgba(26, 32, 44, 0.8)",
+                                "border": "1px solid rgba(74, 85, 104, 0.4)",
+                                "color": "#a0aec0",
+                                "fontSize": "0.75rem"
+                            })
+                        ], size="sm")
+                    ], width=3),
+                    dbc.Col(width=9)
+                ], className="mb-3")
+            ], id="analysis_controls", style={"display": "none"}),
             html.Div(id="team_context_display", className="mt-3")  
         ], lg=8, md=7)
     ])
@@ -704,16 +727,32 @@ def create_analysis_tab():
                 ], className="mb-3"),
                 
                 html.Div([
-                    html.Div([
-                        html.Span("Recent Games: ", className="label", style={"display": "inline-block", "marginRight": "10px"}),
-                        html.Span(id="games_count_display", style={"fontSize": "0.8rem", "color": "#f59e0b", "fontWeight": "600"})
+                    dbc.Row([
+                        dbc.Col([
+                            html.Div("Lookback Games", className="label"),
+                            dbc.InputGroup([
+                                dbc.Input(
+                                    id="games_count_input",
+                                    type="text",
+                                    value="10",
+                                    placeholder="10",
+                                    style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.9rem"}
+                                ),
+                                dbc.InputGroupText("games", style={
+                                    "background": "rgba(26, 32, 44, 0.8)",
+                                    "border": "1px solid rgba(74, 85, 104, 0.4)",
+                                    "color": "#a0aec0",
+                                    "fontSize": "0.8rem"
+                                })
+                            ], size="sm")
+                        ], width=3),
+                        dbc.Col([
+                            html.Div([
+                                html.Span("Analysis Based On: ", className="label", style={"display": "inline-block", "marginRight": "8px"}),
+                                html.Span(id="games_count_display", style={"fontSize": "0.85rem", "color": "#68d391", "fontWeight": "600"})
+                            ], style={"marginTop": "1.2rem"})
+                        ], width=9),
                     ]),
-                    dcc.Slider(
-                        id="games_count_slider",
-                        min=5, max=20, step=5, value=10,
-                        marks={5: '5', 10: '10', 15: '15', 20: '20'},
-                        tooltip={"placement": "bottom", "always_visible": False}
-                    )
                 ], className="mb-3"),
                 
                 html.Div(id="team-analysis-display", className="card", style={"minHeight": "400px"})
@@ -1146,15 +1185,27 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
     ])
 
 @app.callback(
-    Output("team_context_display", "children"),
-    Input("persistent_game_selection", "data"),
+    [Output("team_context_display", "children"),
+     Output("analysis_controls", "style")],
+    [Input("persistent_game_selection", "data"),
+     Input("live_analysis_games_input", "value")],
     prevent_initial_call=True
 )
-def update_team_context(selected_game_data):
+def update_team_context(selected_game_data, games_count):
     """Show team analysis context for selected game"""
     try:
         if not selected_game_data:
-            return ""
+            return "", {"display": "none"}
+        
+        # Validate games count
+        try:
+            games_count = int(games_count) if games_count else 10
+            if games_count < 3:
+                games_count = 3
+            elif games_count > 25:
+                games_count = 25
+        except (ValueError, TypeError):
+            games_count = 10
         
         # Get team IDs and names from ESPN data
         home_team_id = selected_game_data.get('home_team_id')
@@ -1165,6 +1216,7 @@ def update_team_context(selected_game_data):
         # Debug print (remove after testing)
         print(f"DEBUG: home_team_id={home_team_id}, away_team_id={away_team_id}")
         print(f"DEBUG: home_team_name={home_team_name}, away_team_name={away_team_name}")
+        print(f"DEBUG: using {games_count} games for analysis")
         
         if not home_team_id or not away_team_id:
             # Show basic game info even without team IDs for analysis
@@ -1176,11 +1228,11 @@ def update_team_context(selected_game_data):
                     html.P("Historical analysis requires ESPN team data", 
                            style={"color": "#718096", "fontSize": "0.8rem", "margin": "1rem 0 0 0"})
                 ], className="pro-card")
-            ])
+            ]), {"display": "block"}
         
-        # Get team stats with error handling
-        home_stats = get_team_stats(home_team_id, 10)
-        away_stats = get_team_stats(away_team_id, 10)
+        # Get team stats with error handling using dynamic games count
+        home_stats = get_team_stats(home_team_id, games_count)
+        away_stats = get_team_stats(away_team_id, games_count)
         
         if not home_stats or not away_stats:
             return html.Div([
@@ -1189,7 +1241,7 @@ def update_team_context(selected_game_data):
                     html.P(f"{away_team_name} @ {home_team_name}", style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0.5rem 0"}),
                     html.P("Historical data unavailable", style={"color": "#71717a", "fontSize": "0.85rem", "margin": "1rem 0 0 0"})
                 ], className="pro-card")
-            ])
+            ]), {"display": "block"}
     
     except Exception as e:
         print(f"Error in team context callback: {e}")
@@ -1198,7 +1250,7 @@ def update_team_context(selected_game_data):
                 html.H5("Analysis Error", style={"color": "#f87171", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
                 html.P("Unable to load team analysis", style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0.5rem 0 0 0"})
             ], className="pro-card")
-        ])
+        ]), {"display": "none"}
     
     # Calculate implied total
     implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
@@ -1306,7 +1358,7 @@ def update_team_context(selected_game_data):
                 ], width=5),
             ])
         ], className="pro-card")
-    ])
+    ]), {"display": "block"}
 
 # Analysis Tab Callbacks
 @app.callback(
@@ -1517,17 +1569,25 @@ def get_team_name_from_options(team_id, team_options):
 
 @app.callback(
     Output("games_count_display", "children"),
-    Input("games_count_slider", "value")
+    Input("games_count_input", "value")
 )
 def update_games_count_display(games_count):
     """Update the games count display"""
-    return f"{games_count} games"
+    try:
+        games_count = int(games_count) if games_count else 10
+        if games_count < 3:
+            games_count = 3
+        elif games_count > 25:
+            games_count = 25
+    except (ValueError, TypeError):
+        games_count = 10
+    return f"Last {games_count} games"
 
 @app.callback(
     Output("team-analysis-display", "children"),
     Input("team1_selector", "value"),
     Input("team2_selector", "value"),
-    Input("games_count_slider", "value"),
+    Input("games_count_input", "value"),
     State("team1_selector", "options"),
     State("team2_selector", "options")
 )
@@ -1537,6 +1597,16 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
         return dbc.CardBody([
             html.P("Select teams to compare their recent performance", className="text-center text-muted py-4")
         ])
+    
+    # Validate games count from text input
+    try:
+        games_count = int(games_count) if games_count else 10
+        if games_count < 3:
+            games_count = 3
+        elif games_count > 25:
+            games_count = 25
+    except (ValueError, TypeError):
+        games_count = 10
     
     # Get team names from options
     team1_name = get_team_name_from_options(team1_id, team1_options) if team1_id else None
