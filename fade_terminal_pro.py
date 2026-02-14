@@ -340,6 +340,22 @@ app.index_string = '''
                 display: none;
             }
             
+            /* Hide number input spinners/scrollers */
+            input[type="number"]::-webkit-outer-spin-button,
+            input[type="number"]::-webkit-inner-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+            }
+            
+            input[type="number"] {
+                -moz-appearance: textfield !important;
+            }
+            
+            /* Prevent accidental scroll changes on number inputs */
+            input[type="number"]:focus {
+                -moz-appearance: textfield !important;
+            }
+            
             /* Game Search Input */
             #game_search_input.form-control {
                 /* Prevent event bubbling that might close modal */
@@ -395,6 +411,27 @@ app.index_string = '''
                     if (e.target && e.target.id === 'game_search_input') {
                         console.log('Search input focused');
                         e.stopPropagation();
+                    }
+                });
+                
+                // Prevent number inputs from changing values on trackpad/mousewheel scroll
+                document.addEventListener('wheel', function(e) {
+                    if (e.target && e.target.type === 'number' && document.activeElement === e.target) {
+                        console.log('Preventing number input scroll change');
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                }, { passive: false });
+                
+                // Prevent accidental arrow key changes
+                document.addEventListener('keydown', function(e) {
+                    if (e.target && e.target.type === 'number') {
+                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            // Only allow arrow keys if user is actively focused on the input
+                            if (document.activeElement !== e.target) {
+                                e.preventDefault();
+                            }
+                        }
                     }
                 });
             });
@@ -1364,13 +1401,15 @@ def store_selected_game(game_id, games_data):
 @app.callback(
     Output("team1", "value", allow_duplicate=True),
     Output("team2", "value", allow_duplicate=True), 
+    Output("live_total", "value", allow_duplicate=True),
     Output("mins_left", "value", allow_duplicate=True),
     Output("secs_left", "value", allow_duplicate=True),
     Input("selected_game_data", "data"),
+    State("betting_odds_data", "data"),
     prevent_initial_call=True
 )
-def auto_fill_from_game(game_data):
-    """Auto-fill scores and time from selected game (but NOT live total)"""
+def auto_fill_from_game(game_data, betting_odds_data):
+    """Auto-fill scores, time, and sportsbook live total from selected game"""
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
@@ -1404,11 +1443,38 @@ def auto_fill_from_game(game_data):
             minutes_left = 0
             seconds_left = 0
     
-    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, mins:{minutes_left}, secs:{seconds_left} (live total left blank for manual entry)")
+    # Get sportsbook live total from betting odds
+    live_total = None
+    if betting_odds_data and game_data:
+        # Get team names for matching with betting data
+        away_team_name = game_data.get('away_team', '')
+        home_team_name = game_data.get('home_team', '')
+        
+        # Try to match with betting data using team names
+        match_key1 = f"{away_team_name}|{home_team_name}"
+        match_key2 = f"{home_team_name}|{away_team_name}"
+        
+        betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
+        if betting_info:
+            live_total = betting_info.get('avg_total')
+            if live_total:
+                print(f"DEBUG: Found sportsbook total for {away_team_name} @ {home_team_name}: {live_total}")
+            else:
+                print(f"DEBUG: No betting total found for {away_team_name} @ {home_team_name}")
+        else:
+            print(f"DEBUG: No betting data match for {away_team_name} @ {home_team_name}")
+    
+    # Fallback to ESPN current total if no sportsbook data
+    if live_total is None and home_score and away_score:
+        live_total = home_score + away_score
+        print(f"DEBUG: Using ESPN current total as fallback: {live_total}")
+    
+    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, total:{live_total}, mins:{minutes_left}, secs:{seconds_left}")
     
     return (
         home_score,
         away_score,
+        live_total,
         minutes_left,
         seconds_left
     )
