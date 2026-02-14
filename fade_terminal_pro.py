@@ -935,11 +935,15 @@ def update_team_context(game_id, games_data):
         if not selected_game:
             return ""
         
-        # Get team IDs - handle both formats
-        home_team_id = selected_game.get('home_team_id') or selected_game.get('competitors', [{}])[0].get('team', {}).get('id')
-        away_team_id = selected_game.get('away_team_id') or selected_game.get('competitors', [{}])[1].get('team', {}).get('id') if len(selected_game.get('competitors', [])) > 1 else None
+        # Get team IDs and names from ESPN data
+        home_team_id = selected_game.get('home_team_id')
+        away_team_id = selected_game.get('away_team_id')
         home_team_name = selected_game.get('home_team')
         away_team_name = selected_game.get('away_team')
+        
+        # Debug print (remove after testing)
+        print(f"DEBUG: home_team_id={home_team_id}, away_team_id={away_team_id}")
+        print(f"DEBUG: home_team_name={home_team_name}, away_team_name={away_team_name}")
         
         if not home_team_id or not away_team_id:
             # Show basic game info even without team IDs for analysis
