@@ -1364,14 +1364,13 @@ def store_selected_game(game_id, games_data):
 @app.callback(
     Output("team1", "value", allow_duplicate=True),
     Output("team2", "value", allow_duplicate=True), 
-    Output("live_total", "value", allow_duplicate=True),
     Output("mins_left", "value", allow_duplicate=True),
     Output("secs_left", "value", allow_duplicate=True),
     Input("selected_game_data", "data"),
     prevent_initial_call=True
 )
 def auto_fill_from_game(game_data):
-    """Auto-fill scores and time from selected game"""
+    """Auto-fill scores and time from selected game (but NOT live total)"""
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
@@ -1405,15 +1404,11 @@ def auto_fill_from_game(game_data):
             minutes_left = 0
             seconds_left = 0
     
-    # Calculate live total
-    live_total = home_score + away_score if (home_score and away_score) else None
-    
-    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, total:{live_total}, mins:{minutes_left}, secs:{seconds_left}")
+    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, mins:{minutes_left}, secs:{seconds_left} (live total left blank for manual entry)")
     
     return (
         home_score,
         away_score,
-        live_total,
         minutes_left,
         seconds_left
     )
