@@ -6,10 +6,13 @@ import requests
 from datetime import datetime, timedelta, timezone
 import json
 
+# Odds API Configuration
+ODDS_API_KEY = 'c352f4d244a2a3ae32f32136f8d908ac'
+ODDS_BASE_URL = 'https://api.the-odds-api.com/v4'
+
 app = dash.Dash(__name__, external_stylesheets=[
     dbc.themes.BOOTSTRAP,
-    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
-    "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
 ], suppress_callback_exceptions=True)
 
 def convert_utc_to_est(utc_time_str):
@@ -18,12 +21,6 @@ def convert_utc_to_est(utc_time_str):
         # Parse UTC time from ESPN API
         dt_utc = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
         
-        # Convert to Eastern Time (automatically handles EST/EDT based on date)
-        # During standard time: UTC-5 (EST)
-        # During daylight time: UTC-4 (EDT)
-        
-        # Simple DST check: 2nd Sunday in March to 1st Sunday in November
-        # For basketball season (Nov-April), mostly EST except March games
         year = dt_utc.year
         
         # Approximate DST dates (this covers most cases accurately)
@@ -54,905 +51,295 @@ app.index_string = '''
 <html>
     <head>
         {%metas%}
-        <title>CBB Fade Terminal • v2.0</title>
+        <title>Fade System</title>
         {%favicon%}
         {%css%}
         <style>
-            /* =====================================================
-               PREMIUM TRADING TERMINAL DESIGN SYSTEM v2.0
-               High-End Sports Analytics Interface
-            ===================================================== */
-            
-            :root {
-                /* Core Palette - Expensive & Professional */
-                --void: #050609;
-                --primary: #0a0d12;
-                --secondary: #0f1419;
-                --tertiary: #141922;
-                
-                /* Glassmorphic Surfaces */
-                --glass-primary: rgba(15, 20, 30, 0.85);
-                --glass-secondary: rgba(25, 35, 45, 0.75);
-                --glass-tertiary: rgba(35, 45, 55, 0.65);
-                
-                /* Premium Accents */
-                --cyan: #00d4ff;
-                --violet: #8b5cf6;
-                --emerald: #10b981;
-                --amber: #f59e0b;
-                --rose: #f43f5e;
-                
-                /* Typography */
-                --text-primary: #ffffff;
-                --text-secondary: #a1a1aa;
-                --text-tertiary: #71717a;
-                
-                /* Glow Effects */
-                --glow-cyan: 0 0 25px rgba(0, 212, 255, 0.4);
-                --glow-emerald: 0 0 25px rgba(16, 185, 129, 0.4);
-                --glow-amber: 0 0 25px rgba(245, 158, 11, 0.4);
-                --glow-violet: 0 0 25px rgba(139, 92, 246, 0.4);
-                
-                /* Depth & Shadows */
-                --shadow-void: 0 0 80px rgba(0, 0, 0, 0.9);
-                --shadow-deep: 0 25px 80px rgba(0, 0, 0, 0.6);
-                --shadow-mid: 0 15px 50px rgba(0, 0, 0, 0.4);
-                --shadow-soft: 0 8px 25px rgba(0, 0, 0, 0.3);
-                
-                /* Borders */
-                --border-primary: rgba(255, 255, 255, 0.12);
-                --border-secondary: rgba(255, 255, 255, 0.06);
-                --border-accent: rgba(0, 212, 255, 0.35);
-                
-                /* Animation Curves */
-                --ease: cubic-bezier(0.4, 0, 0.2, 1);
-                --bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-                --swift: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            }
-            
-            * {
-                box-sizing: border-box;
-            }
-            
             body {
-                background: 
-                    radial-gradient(ellipse at top, rgba(0, 212, 255, 0.03) 0%, transparent 50%),
-                    radial-gradient(ellipse at bottom, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
-                    linear-gradient(180deg, var(--void) 0%, var(--primary) 40%, var(--secondary) 100%);
-                background-attachment: fixed;
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-                color: var(--text-primary);
+                background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+                font-family: 'Inter', sans-serif;
+                color: #e2e8f0;
                 font-weight: 400;
-                line-height: 1.6;
-                overflow-x: hidden;
-                min-height: 100vh;
             }
             .card {
-                background: var(--glass-primary);
-                border: 1px solid var(--border-primary);
-                border-radius: 20px;
-                backdrop-filter: blur(20px) saturate(180%);
-                box-shadow: var(--shadow-deep), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-                position: relative;
-                overflow: hidden;
-                transition: all 0.4s var(--ease);
-            }
-            
-            .card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 1px;
-                background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
-                opacity: 0.6;
-            }
-            
-            .card:hover {
-                transform: translateY(-2px);
-                box-shadow: var(--shadow-void), var(--glow-cyan);
-                border-color: var(--border-accent);
+                background: rgba(26, 32, 44, 0.8);
+                border: 1px solid rgba(74, 85, 104, 0.3);
+                border-radius: 12px;
+                backdrop-filter: blur(8px);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
             }
             .form-control {
-                background: var(--glass-secondary) !important;
-                border: 1px solid var(--border-primary) !important;
-                color: var(--text-primary) !important;
-                font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
-                font-weight: 500;
-                border-radius: 12px !important;
-                font-size: 0.9rem;
-                padding: 0.8rem 1rem;
-                transition: all 0.3s var(--ease);
-                backdrop-filter: blur(15px);
-                position: relative;
-            }
-            
-            .form-control:focus {
-                border-color: var(--border-accent) !important;
-                box-shadow: var(--glow-cyan), inset 0 0 0 1px var(--border-accent) !important;
-                background: var(--glass-primary) !important;
-                transform: scale(1.02);
-            }
-            
-            .form-control:hover {
-                border-color: var(--border-accent) !important;
-                background: var(--glass-primary) !important;
-            }
-            
-            .form-control::placeholder { 
-                color: var(--text-tertiary) !important; 
+                background: rgba(26, 32, 44, 0.7) !important;
+                border: 1px solid rgba(74, 85, 104, 0.4) !important;
+                color: #e2e8f0 !important;
                 font-weight: 400;
-            }
-            .btn-adj {
-                background: var(--glass-tertiary) !important;
-                border: 1px solid var(--border-primary) !important;
-                color: var(--text-secondary) !important;
-                font-family: 'JetBrains Mono', monospace;
-                font-weight: 600;
-                border-radius: 10px;
-                transition: all 0.25s var(--ease);
-                font-size: 0.85rem;
-                padding: 0.4rem 0.7rem;
-                min-width: 40px;
-                height: 40px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                position: relative;
-                backdrop-filter: blur(10px);
-            }
-            
-            .btn-adj::before {
-                content: '';
-                position: absolute;
-                inset: 0;
-                border-radius: inherit;
-                background: linear-gradient(135deg, var(--cyan), var(--violet));
-                opacity: 0;
-                transition: opacity 0.25s var(--ease);
-                z-index: -1;
-            }
-            
-            .btn-adj:hover { 
-                color: var(--text-primary) !important;
-                border-color: var(--border-accent) !important;
-                transform: translateY(-1px) scale(1.05);
-                box-shadow: var(--glow-cyan);
-            }
-            
-            .btn-adj:hover::before {
-                opacity: 0.1;
-            }
-            
-            .btn-adj:active {
-                transform: translateY(0) scale(0.98);
-                box-shadow: var(--shadow-soft);
-            }
-            
-            /* Micro Buttons for Score Inputs */
-            .btn-micro {
-                background: var(--glass-tertiary) !important;
-                border: 1px solid var(--border-secondary) !important;
-                color: var(--text-tertiary) !important;
-                font-family: 'JetBrains Mono', monospace;
-                font-weight: 600;
                 border-radius: 6px !important;
-                font-size: 0.7rem !important;
-                padding: 0.2rem 0.4rem !important;
-                min-width: 28px !important;
-                height: 24px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                transition: all 0.2s var(--ease) !important;
-                opacity: 0.7;
+                font-size: 0.9rem;
+                padding: 0.6rem 0.8rem;
+                transition: all 0.2s ease;
             }
-            
-            .btn-micro:hover {
-                color: var(--text-secondary) !important;
-                border-color: var(--border-primary) !important;
-                background: var(--glass-secondary) !important;
-                opacity: 1;
-                transform: scale(1.05);
+            .form-control:focus {
+                border-color: #4a5568 !important;
+                box-shadow: 0 0 0 2px rgba(74, 85, 104, 0.2) !important;
             }
-            
-            .btn-micro:active {
+            .form-control::placeholder { color: #718096 !important; }
+            .btn-adj {
+                background: rgba(74, 85, 104, 0.15) !important;
+                border: 1px solid rgba(74, 85, 104, 0.2) !important;
+                color: #a0aec0 !important;
+                font-weight: 500;
+                border-radius: 4px;
+                transition: all 0.2s ease;
+                font-size: 0.8rem;
+                padding: 0.25rem 0.5rem;
+                min-width: 32px;
+            }
+            .btn-adj:hover { 
+                background: rgba(74, 85, 104, 0.25) !important; 
+                color: #e2e8f0 !important;
+                border-color: rgba(74, 85, 104, 0.3) !important;
+            }
+            .btn-adj:active {
+                background: rgba(74, 85, 104, 0.35) !important;
                 transform: scale(0.95);
-                opacity: 0.8;
             }
             .label { 
                 font-size: 0.75rem; 
-                color: var(--text-secondary); 
+                color: #a0aec0; 
                 text-transform: uppercase; 
-                letter-spacing: 1.2px; 
-                margin-bottom: 0.6rem; 
-                font-weight: 600;
-                font-family: 'Inter', sans-serif;
-                position: relative;
-            }
-            
-            .label::after {
-                content: '';
-                position: absolute;
-                bottom: -2px;
-                left: 0;
-                width: 20px;
-                height: 1px;
-                background: linear-gradient(90deg, var(--cyan), transparent);
-                opacity: 0.5;
+                letter-spacing: 0.8px; 
+                margin-bottom: 0.5rem; 
+                font-weight: 500;
             }
             .output-card {
-                background: var(--glass-primary);
-                border: 1px solid var(--border-primary);
-                border-radius: 24px;
-                backdrop-filter: blur(25px) saturate(200%);
-                box-shadow: var(--shadow-void), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .output-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 2px;
-                background: linear-gradient(90deg, 
-                    transparent, 
-                    var(--cyan), 
-                    var(--violet), 
-                    var(--emerald), 
-                    transparent
-                );
-                opacity: 0.6;
-            }
-            
-            .output-card::after {
-                content: '';
-                position: absolute;
-                inset: 1px;
-                border-radius: 23px;
-                background: linear-gradient(135deg, 
-                    rgba(0, 212, 255, 0.02), 
-                    rgba(139, 92, 246, 0.02)
-                );
-                pointer-events: none;
+                background: rgba(24, 24, 27, 0.9);
+                border: 1px solid rgba(39, 39, 42, 0.6);
+                border-radius: 20px;
+                backdrop-filter: blur(12px);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
             }
             .metric-value { 
-                font-family: 'JetBrains Mono', monospace;
-                font-weight: 700;
-                font-size: 2.2rem;
-                letter-spacing: -0.03em;
-                line-height: 0.9;
-                background: linear-gradient(135deg, var(--text-primary), var(--cyan));
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                transition: all 0.3s var(--ease);
+                font-weight: 600;
+                font-size: 2rem;
+                letter-spacing: -0.02em;
+                line-height: 1;
             }
-            
-            .metric-value:hover {
-                transform: scale(1.05);
-                filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.3));
-            }
-            
             .metric-label {
                 font-size: 0.75rem;
-                font-weight: 600;
-                letter-spacing: 1.5px;
+                font-weight: 500;
+                letter-spacing: 1px;
                 text-transform: uppercase;
-                color: var(--text-secondary);
-                margin-bottom: 0.4rem;
-                font-family: 'Inter', sans-serif;
-                position: relative;
-            }
-            
-            .metric-label::before {
-                content: '◦';
-                color: var(--cyan);
-                margin-right: 0.5rem;
-                opacity: 0.6;
+                color: #a0aec0;
+                margin-bottom: 0.25rem;
             }
             .pro-card {
-                background: var(--glass-primary);
-                border: 1px solid var(--border-primary);
-                border-radius: 20px;
-                padding: 2rem;
-                backdrop-filter: blur(20px) saturate(180%);
-                box-shadow: var(--shadow-deep), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-                position: relative;
-                overflow: hidden;
-                transition: all 0.4s var(--ease);
+                background: rgba(26, 32, 44, 0.9);
+                border: 1px solid rgba(74, 85, 104, 0.25);
+                border-radius: 12px;
+                padding: 1.5rem;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
             }
-            
-            .pro-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 1px;
-                background: linear-gradient(90deg, 
-                    transparent, 
-                    var(--border-accent), 
-                    transparent
-                );
-                opacity: 0.7;
-            }
-            
-            .pro-card:hover {
-                transform: translateY(-3px);
-                box-shadow: var(--shadow-void), var(--glow-cyan);
-                border-color: var(--border-accent);
-            }
-            
-            .pro-card:hover::before {
-                background: linear-gradient(90deg, 
-                    transparent, 
-                    var(--cyan), 
-                    var(--violet), 
-                    transparent
-                );
-            }
-            /* Premium Dropdown System */
+            /* Professional Dropdown Styling */
             .dark-dropdown .Select-control { 
-                background: var(--glass-secondary) !important; 
-                border: 1px solid var(--border-primary) !important; 
-                color: var(--text-primary) !important; 
-                border-radius: 14px !important;
-                min-height: 48px;
+                background: rgba(26, 32, 44, 0.9) !important; 
+                border: 1px solid rgba(74, 85, 104, 0.4) !important; 
+                color: #e2e8f0 !important; 
+                border-radius: 8px !important;
+                min-height: 42px;
                 font-size: 0.9rem;
-                font-family: 'JetBrains Mono', 'SF Mono', monospace;
+                font-family: 'SF Mono', Consolas, monospace;
                 font-weight: 500;
-                transition: all 0.3s var(--ease);
-                backdrop-filter: blur(15px);
-                position: relative;
+                transition: all 0.2s ease;
             }
-            
-            .dark-dropdown .Select-control::before {
-                content: '';
-                position: absolute;
-                inset: -1px;
-                border-radius: inherit;
-                background: linear-gradient(135deg, var(--cyan), var(--violet));
-                opacity: 0;
-                transition: opacity 0.3s var(--ease);
-                z-index: -1;
-            }
-            
             .dark-dropdown .Select-control:hover {
-                border-color: var(--border-accent) !important;
-                background: var(--glass-primary) !important;
-                transform: translateY(-1px);
-                box-shadow: var(--glow-cyan);
+                border-color: rgba(74, 85, 104, 0.6) !important;
+                background: rgba(26, 32, 44, 0.95) !important;
             }
-            
-            .dark-dropdown .Select-control:hover::before {
-                opacity: 0.1;
-            }
-            
             .dark-dropdown .Select-placeholder { 
-                color: var(--text-tertiary) !important; 
+                color: #718096 !important; 
                 font-weight: 400; 
                 font-family: 'Inter', sans-serif;
             }
-            
             .dark-dropdown .Select-value-label { 
-                color: var(--text-primary) !important; 
-                font-weight: 600; 
-                font-family: 'JetBrains Mono', monospace;
+                color: #f7fafc !important; 
+                font-weight: 500; 
+                font-family: 'SF Mono', Consolas, monospace;
             }
-            
             .dark-dropdown .Select-input > input { 
-                color: var(--text-primary) !important; 
-                font-family: 'JetBrains Mono', monospace;
+                color: #e2e8f0 !important; 
+                font-family: 'SF Mono', Consolas, monospace;
             }
-            
             .dark-dropdown .Select-menu-outer { 
-                background: var(--glass-primary) !important; 
-                border: 1px solid var(--border-accent) !important; 
-                border-radius: 14px !important;
-                backdrop-filter: blur(25px) saturate(180%);
-                box-shadow: var(--shadow-void), var(--glow-cyan);
-                max-height: 350px;
-                margin-top: 4px;
+                background: rgba(26, 32, 44, 0.98) !important; 
+                border: 1px solid rgba(74, 85, 104, 0.4) !important; 
+                border-radius: 8px !important;
+                backdrop-filter: blur(12px);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                max-height: 300px;
             }
-            
             .dark-dropdown .Select-menu { 
                 background: transparent !important;
-                max-height: 320px;
+                max-height: 280px;
             }
-            
             .dark-dropdown .Select-option { 
-                color: var(--text-secondary) !important; 
+                color: #cbd5e0 !important; 
                 background: transparent !important; 
-                padding: 14px 18px !important;
+                padding: 12px 16px !important;
                 font-size: 0.9rem;
-                font-family: 'JetBrains Mono', monospace;
+                font-family: 'SF Mono', Consolas, monospace;
                 font-weight: 500;
-                transition: all 0.2s var(--ease);
+                transition: all 0.15s ease;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
-                position: relative;
             }
-            
-            .dark-dropdown .Select-option::before {
-                content: '▸';
-                color: var(--cyan);
-                margin-right: 8px;
-                opacity: 0;
-                transition: opacity 0.2s var(--ease);
-            }
-            
             .dark-dropdown .Select-option.is-focused { 
-                background: var(--glass-secondary) !important; 
-                color: var(--text-primary) !important;
-                transform: translateX(4px);
+                background: rgba(74, 85, 104, 0.2) !important; 
+                color: #f7fafc !important; 
             }
-            
-            .dark-dropdown .Select-option.is-focused::before {
-                opacity: 1;
-            }
-            
             .dark-dropdown .Select-option.is-selected { 
-                background: var(--glass-tertiary) !important; 
-                color: var(--cyan) !important;
-                font-weight: 600;
+                background: rgba(74, 85, 104, 0.3) !important; 
+                color: #ffffff !important; 
             }
             
-            /* Premium Button System */
+            /* Professional Button Styling */
             .btn-primary {
-                background: linear-gradient(135deg, var(--cyan), var(--violet)) !important;
-                border: 1px solid var(--border-accent) !important;
-                border-radius: 12px !important;
-                font-weight: 600 !important;
-                padding: 0.7rem 1.4rem !important;
-                font-size: 0.9rem !important;
-                font-family: 'Inter', sans-serif;
-                transition: all 0.3s var(--ease) !important;
-                box-shadow: var(--shadow-soft), var(--glow-cyan) !important;
-                color: var(--text-primary) !important;
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .btn-primary::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-                transition: left 0.5s var(--ease);
-            }
-            
-            .btn-primary:hover {
-                transform: translateY(-2px) scale(1.02) !important;
-                box-shadow: var(--shadow-deep), var(--glow-cyan) !important;
-            }
-            
-            .btn-primary:hover::before {
-                left: 100%;
-            }
-            
-            .btn-primary:active {
-                transform: translateY(0) scale(0.98) !important;
-                box-shadow: var(--shadow-soft) !important;
-            }
-            
-            .btn-secondary {
-                background: var(--glass-secondary) !important;
-                border: 1px solid var(--border-primary) !important;
-                color: var(--text-secondary) !important;
-                border-radius: 12px !important;
+                background: #2d3748 !important;
+                border: none !important;
+                border-radius: 6px !important;
                 font-weight: 500 !important;
-                padding: 0.7rem 1.4rem !important;
-                font-size: 0.9rem !important;
-                font-family: 'Inter', sans-serif;
-                transition: all 0.3s var(--ease) !important;
-                backdrop-filter: blur(10px);
-                position: relative;
+                padding: 0.5rem 1rem !important;
+                font-size: 0.85rem !important;
+                transition: all 0.2s ease !important;
+                box-shadow: none !important;
+                color: #e2e8f0 !important;
             }
-            
+            .btn-primary:hover {
+                background: #4a5568 !important;
+                color: #f7fafc !important;
+            }
+            .btn-primary:active {
+                background: #1a202c !important;
+                transform: scale(0.98) !important;
+            }
+            .btn-secondary {
+                background: rgba(45, 55, 72, 0.1) !important;
+                border: 1px solid rgba(45, 55, 72, 0.2) !important;
+                color: #a0aec0 !important;
+                border-radius: 6px !important;
+                font-weight: 500 !important;
+                padding: 0.5rem 1rem !important;
+                font-size: 0.85rem !important;
+                transition: all 0.2s ease !important;
+            }
             .btn-secondary:hover {
-                background: var(--glass-primary) !important;
-                border-color: var(--border-accent) !important;
-                color: var(--text-primary) !important;
-                transform: translateY(-1px) !important;
-                box-shadow: var(--glow-cyan) !important;
+                background: rgba(45, 55, 72, 0.15) !important;
+                border-color: rgba(45, 55, 72, 0.3) !important;
+                color: #e2e8f0 !important;
             }
-            
             .btn-secondary:active {
-                transform: translateY(0) scale(0.98) !important;
-                box-shadow: var(--shadow-soft) !important;
+                background: rgba(45, 55, 72, 0.25) !important;
+                transform: scale(0.98) !important;
             }
             
-            /* Premium Slider System */
+            /* Professional Slider */
             .rc-slider {
-                background: var(--glass-tertiary) !important;
-                border-radius: 8px !important;
-                height: 6px !important;
-                position: relative;
+                background: rgba(74, 85, 104, 0.3) !important;
+                border-radius: 3px !important;
+                height: 4px !important;
             }
-            
-            .rc-slider::before {
-                content: '';
-                position: absolute;
-                top: 50%;
-                left: 0;
-                right: 0;
-                height: 1px;
-                background: linear-gradient(90deg, var(--cyan), var(--violet), var(--emerald));
-                transform: translateY(-50%);
-                opacity: 0.3;
-            }
-            
             .rc-slider-track {
-                background: linear-gradient(90deg, var(--cyan), var(--violet)) !important;
-                border-radius: 8px !important;
-                height: 6px !important;
-                box-shadow: var(--glow-cyan);
+                background: #4a5568 !important;
+                border-radius: 3px !important;
+                height: 4px !important;
             }
-            
             .rc-slider-handle {
-                background: var(--text-primary) !important;
-                border: 3px solid var(--cyan) !important;
-                box-shadow: var(--shadow-mid), var(--glow-cyan) !important;
-                width: 24px !important;
-                height: 24px !important;
-                margin-top: -9px !important;
-                transition: all 0.3s var(--ease);
-                position: relative;
+                background: #e2e8f0 !important;
+                border: 2px solid #4a5568 !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+                width: 18px !important;
+                height: 18px !important;
+                margin-top: -7px !important;
             }
-            
-            .rc-slider-handle::before {
-                content: '';
-                position: absolute;
-                inset: 2px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, var(--cyan), var(--violet));
-                opacity: 0.8;
-            }
-            
-            .rc-slider-handle:hover {
-                transform: scale(1.2);
-                box-shadow: var(--shadow-deep), var(--glow-cyan);
-            }
-            
             .rc-slider-mark-text {
-                color: var(--text-secondary) !important;
+                color: #a0aec0 !important;
                 font-size: 0.75rem !important;
-                font-family: 'JetBrains Mono', monospace;
-                font-weight: 600;
             }
             
-            /* Premium Game Selection System */
-            .game-selector-btn {
-                background: var(--glass-secondary) !important;
-                border: 1px solid var(--border-primary) !important;
-                border-radius: 14px !important;
-                transition: all 0.3s var(--ease) !important;
-                backdrop-filter: blur(15px);
-                position: relative;
-            }
-            
-            .game-selector-btn::before {
-                content: '';
-                position: absolute;
-                inset: -1px;
-                border-radius: inherit;
-                background: linear-gradient(135deg, var(--cyan), var(--violet));
-                opacity: 0;
-                transition: opacity 0.3s var(--ease);
-                z-index: -1;
-            }
-            
+            /* Game Selection Modal */
             .game-selector-btn:hover {
-                background: var(--glass-primary) !important;
-                border-color: var(--border-accent) !important;
-                transform: translateY(-2px) !important;
-                box-shadow: var(--glow-cyan);
-            }
-            
-            .game-selector-btn:hover::before {
-                opacity: 0.1;
+                background: rgba(26, 32, 44, 0.95) !important;
+                border-color: rgba(74, 85, 104, 0.6) !important;
+                transform: translateY(-1px);
             }
             
             .game-card {
-                background: var(--glass-secondary);
-                border: 1px solid var(--border-primary);
-                border-radius: 16px;
-                padding: 1.2rem;
-                margin: 0.6rem 0;
+                background: rgba(26, 32, 44, 0.6);
+                border: 1px solid rgba(74, 85, 104, 0.3);
+                border-radius: 8px;
+                padding: 1rem;
+                margin: 0.5rem 0;
                 cursor: pointer;
-                transition: all 0.3s var(--ease);
-                font-family: 'JetBrains Mono', monospace;
-                position: relative;
-                overflow: hidden;
-                backdrop-filter: blur(15px);
-            }
-            
-            .game-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 2px;
-                background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-                opacity: 0;
-                transition: opacity 0.3s var(--ease);
+                transition: all 0.2s ease;
+                font-family: 'SF Mono', Consolas, monospace;
             }
             
             .game-card:hover {
-                background: var(--glass-primary);
-                border-color: var(--border-accent);
-                transform: translateY(-3px) scale(1.02);
-                box-shadow: var(--shadow-deep), var(--glow-cyan);
-            }
-            
-            .game-card:hover::before {
-                opacity: 1;
+                background: rgba(74, 85, 104, 0.2);
+                border-color: rgba(74, 85, 104, 0.5);
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             }
             
             .game-time {
-                color: var(--emerald);
-                font-weight: 700;
+                color: #68d391;
+                font-weight: 600;
                 font-size: 0.9rem;
-                margin-bottom: 0.6rem;
-                font-family: 'JetBrains Mono', monospace;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                position: relative;
-            }
-            
-            .game-time::before {
-                content: '⏰';
-                margin-right: 0.5rem;
-                opacity: 0.7;
+                margin-bottom: 0.5rem;
             }
             
             .game-matchup {
-                color: var(--text-primary);
-                font-weight: 600;
-                font-size: 1.05rem;
-                margin-bottom: 0.4rem;
-                font-family: 'Inter', sans-serif;
-                line-height: 1.3;
+                color: #e2e8f0;
+                font-weight: 500;
+                font-size: 1rem;
+                margin-bottom: 0.25rem;
             }
             
             .game-details {
-                color: var(--text-secondary);
-                font-size: 0.85rem;
-                font-family: 'JetBrains Mono', monospace;
-                font-weight: 500;
+                color: #a0aec0;
+                font-size: 0.8rem;
             }
             
             .live-indicator {
-                color: var(--rose);
-                font-weight: 700;
+                color: #f56565;
+                font-weight: 600;
                 font-size: 0.8rem;
-                font-family: 'JetBrains Mono', monospace;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                position: relative;
-                animation: pulse 2s infinite;
             }
             
-            .live-indicator::before {
-                content: '●';
-                margin-right: 0.5rem;
-                animation: blink 1s infinite;
-            }
-            
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.7; }
-            }
-            
-            @keyframes blink {
-                0%, 50% { opacity: 1; }
-                51%, 100% { opacity: 0.3; }
-            }
-            
-            /* Premium Analysis Cards */
-            .analysis-game-card {
-                background: var(--glass-secondary) !important;
-                border: 1px solid var(--border-primary) !important;
-                border-radius: 14px !important;
-                transition: all 0.3s var(--ease) !important;
-                backdrop-filter: blur(15px);
-                position: relative;
-            }
-            
-            .analysis-game-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 1px;
-                background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
-                opacity: 0;
-                transition: opacity 0.3s var(--ease);
-            }
-            
+            /* Analysis Game Cards */
             .analysis-game-card:hover {
-                background: var(--glass-primary) !important;
-                border-color: var(--border-accent) !important;
-                transform: translateY(-2px) scale(1.01) !important;
-                box-shadow: var(--shadow-mid), var(--glow-cyan) !important;
+                background: rgba(74, 85, 104, 0.15) !important;
+                border-color: rgba(74, 85, 104, 0.4) !important;
+                transform: translateY(-1px);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             }
             
-            .analysis-game-card:hover::before {
-                opacity: 1;
-            }
-            
-            /* Premium Team Logos */
+            /* Team Logos */
             .team-logo {
                 object-fit: contain;
-                filter: brightness(0.9) saturate(1.1);
-                transition: all 0.3s var(--ease);
-                background: var(--glass-tertiary);
-                border-radius: 6px;
-                border: 1px solid var(--border-secondary);
-                position: relative;
+                filter: brightness(0.95);
+                transition: all 0.2s ease;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 3px;
             }
-            
-            .team-logo::after {
-                content: '';
-                position: absolute;
-                inset: 0;
-                border-radius: inherit;
-                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-                pointer-events: none;
-            }
-            
             .team-logo:hover {
-                filter: brightness(1.1) saturate(1.2);
-                transform: scale(1.08);
-                box-shadow: var(--glow-cyan);
-                border-color: var(--border-accent);
+                filter: brightness(1.1);
+                transform: scale(1.05);
             }
-            
-            /* Hide broken images elegantly */
+            /* Hide broken images */
             .team-logo[src=""], .team-logo:not([src]) {
                 display: none;
-            }
-            
-            .team-logo[src=""]:after, .team-logo:not([src]):after {
-                content: '🏀';
-                position: absolute;
-                inset: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 0.8rem;
-                opacity: 0.5;
-            }
-            
-            /* =====================================================
-               PREMIUM NAVIGATION & HEADER SYSTEM
-            ===================================================== */
-            
-            .nav-tabs {
-                border-bottom: 2px solid var(--border-primary);
-                margin-bottom: 2rem;
-                background: var(--glass-tertiary);
-                border-radius: 16px 16px 0 0;
-                padding: 0.5rem 0.5rem 0 0.5rem;
-                backdrop-filter: blur(15px);
-            }
-            
-            .nav-tabs .nav-link {
-                background: transparent;
-                border: none;
-                color: var(--text-secondary);
-                font-family: 'Inter', sans-serif;
-                font-weight: 600;
-                padding: 1rem 2rem;
-                border-radius: 12px;
-                transition: all 0.3s var(--ease);
-                position: relative;
-                text-transform: uppercase;
-                letter-spacing: 0.8px;
-                font-size: 0.85rem;
-                margin-right: 0.5rem;
-            }
-            
-            .nav-tabs .nav-link::before {
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 50%;
-                width: 0;
-                height: 2px;
-                background: var(--cyan);
-                transition: all 0.3s var(--ease);
-                transform: translateX(-50%);
-            }
-            
-            .nav-tabs .nav-link:hover {
-                color: var(--text-primary);
-                background: var(--glass-secondary);
-                transform: translateY(-2px);
-            }
-            
-            .nav-tabs .nav-link.active {
-                color: var(--cyan);
-                background: var(--glass-primary);
-                border: 1px solid var(--border-accent);
-                box-shadow: var(--glow-cyan);
-            }
-            
-            .nav-tabs .nav-link.active::before {
-                width: 60%;
-            }
-            
-            /* Premium Container */
-            .container-fluid {
-                position: relative;
-            }
-            
-            .container-fluid::before {
-                content: '';
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: 
-                    radial-gradient(circle at 20% 80%, rgba(0, 212, 255, 0.05) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
-                pointer-events: none;
-                z-index: -1;
-            }
-            
-            /* Enhanced Typography */
-            h1, h2, h3, h4, h5, h6 {
-                font-family: 'Inter', sans-serif;
-                font-weight: 700;
-                background: linear-gradient(135deg, var(--text-primary), var(--cyan));
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                letter-spacing: -0.02em;
-            }
-            
-            /* Number Enhancement */
-            .number-display {
-                font-family: 'JetBrains Mono', monospace;
-                font-variant-numeric: tabular-nums;
-                transition: all 0.3s var(--ease);
-            }
-            
-            .number-display:hover {
-                transform: scale(1.05);
-                text-shadow: 0 0 10px var(--cyan);
-            }
-            
-            /* Scrollbar Styling */
-            ::-webkit-scrollbar {
-                width: 8px;
-            }
-            
-            ::-webkit-scrollbar-track {
-                background: var(--glass-tertiary);
-                border-radius: 4px;
-            }
-            
-            ::-webkit-scrollbar-thumb {
-                background: linear-gradient(180deg, var(--cyan), var(--violet));
-                border-radius: 4px;
-                border: 1px solid var(--border-primary);
-            }
-            
-            ::-webkit-scrollbar-thumb:hover {
-                background: linear-gradient(180deg, var(--violet), var(--cyan));
             }
         </style>
     </head>
@@ -1064,10 +451,21 @@ def fetch_games_by_date(date_str=None):
             if game_info['is_live']:
                 try:
                     clock = game_info['clock']
+                    period = game_info['period']
                     if ':' in clock:
                         mins, secs = clock.split(':')
-                        game_info['minutes_left'] = int(mins)
-                        game_info['seconds_left'] = int(secs)
+                        minutes_left = int(mins)
+                        seconds_left = int(secs.split('.')[0])  # Remove decimals
+                        
+                        # Automatically convert first half time to full game time remaining
+                        if period == 1:  # First half
+                            original_mins = minutes_left
+                            minutes_left += 20  # Add 20 for entire second half
+                            print(f"DEBUG: First half auto-conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
+                        # If period == 2 (second half) or overtime, leave as is
+                        
+                        game_info['minutes_left'] = minutes_left
+                        game_info['seconds_left'] = seconds_left
                     else:
                         game_info['minutes_left'] = 0
                         game_info['seconds_left'] = 0
@@ -1150,6 +548,72 @@ def fetch_team_recent_games(team_id, num_games=10):
         print(f"Error fetching team games: {e}")
         return []
 
+# ===== ODDS API FUNCTIONS =====
+
+def get_basketball_odds(sport_key='basketball_ncaab'):
+    """Get odds for college basketball games"""
+    url = f"{ODDS_BASE_URL}/sports/{sport_key}/odds"
+    
+    params = {
+        'apiKey': ODDS_API_KEY,
+        'regions': 'us',  # US sportsbooks
+        'markets': 'totals',  # Just totals for now (simpler)
+        'oddsFormat': 'american',
+        'dateFormat': 'iso'
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        
+        games = response.json()
+        print(f"📊 Odds API: Found {len(games)} games with betting lines")
+        return games
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Odds API Error: {e}")
+        return []
+
+def extract_betting_totals(odds_games):
+    """Extract betting totals from odds data"""
+    betting_data = {}
+    
+    for game in odds_games:
+        # Create key from team names for matching
+        home_team = game['home_team']
+        away_team = game['away_team']
+        
+        # Extract totals from all sportsbooks
+        totals = []
+        for bookmaker in game.get('bookmakers', []):
+            for market in bookmaker.get('markets', []):
+                if market['key'] == 'totals':
+                    for outcome in market['outcomes']:
+                        if outcome['name'] == 'Over':
+                            totals.append(outcome['point'])
+        
+        if totals:
+            avg_total = sum(totals) / len(totals)
+            total_range = max(totals) - min(totals) if len(totals) > 1 else 0
+            
+            # Store with multiple possible team name combinations
+            game_keys = [
+                f"{away_team}|{home_team}",
+                f"{home_team}|{away_team}"
+            ]
+            
+            betting_info = {
+                'avg_total': avg_total,
+                'total_range': total_range,
+                'num_books': len(totals),
+                'commence_time': game['commence_time']
+            }
+            
+            for key in game_keys:
+                betting_data[key] = betting_info
+    
+    return betting_data
+
 def format_game_option(game):
     """Format game data for dropdown display - clean and professional"""
     def shorten_team_name(name, max_len=12):
@@ -1230,40 +694,19 @@ def get_fade_analysis(team1, team2, live_total, min_left, my_bet=None, period_ti
 def score_input(label, input_id):
     return html.Div([
         html.Div(label, className="label"),
-        html.Div([
-            # Main input field (normal like others)
-            dbc.Input(
-                id=input_id, 
-                type="number", 
-                style={"textAlign": "center", "marginBottom": "0.5rem"}
-            ),
-            # Small +/- buttons below the input
-            html.Div([
-                dbc.Button("−", id={"type": "dec", "index": input_id}, 
-                          className="btn-micro", size="sm"),
-                dbc.Button("+", id={"type": "inc", "index": input_id}, 
-                          className="btn-micro", size="sm"),
-            ], style={
-                "display": "flex", 
-                "gap": "0.25rem", 
-                "justifyContent": "center"
-            })
-        ])
+        dbc.InputGroup([
+            dbc.Button("−", id={"type": "dec", "index": input_id}, className="btn-adj px-3"),
+            dbc.Input(id=input_id, type="number", placeholder="0", style={"textAlign": "center"}),
+            dbc.Button("+", id={"type": "inc", "index": input_id}, className="btn-adj px-3"),
+        ], size="sm")
     ], className="mb-3")
 
 
 app.layout = dbc.Container([
     # Professional Header
     html.Div([
-        html.H2("CBB Fade Terminal v2.0", 
-                style={
-                    "fontWeight": "700", 
-                    "marginBottom": "0.5rem", 
-                    "letterSpacing": "-0.02em",
-                    "fontSize": "2.2rem",
-                    "textAlign": "center",
-                    "position": "relative"
-                }),
+        html.H2("- CBB Fade Terminal -", 
+                style={"fontWeight": "600", "color": "#f7fafc", "marginBottom": "0.5rem", "letterSpacing": "-0.02em"}),
     ], className="text-center", style={"padding": "2rem 0 1.5rem 0"}),
     
     # Professional Tabs
@@ -1285,6 +728,7 @@ app.layout = dbc.Container([
     dcc.Store(id="today_games_data", data=[]),
     dcc.Store(id="tomorrow_games_data", data=[]),
     dcc.Store(id="week_games_data", data=[]),
+    dcc.Store(id="betting_odds_data", data={}),
     dcc.Interval(id="refresh_games", interval=15*1000, n_intervals=0),  # Refresh every 15 seconds
     
     # Game Selection Modal
@@ -1359,23 +803,23 @@ def create_fade_tab():
                     
                     html.Div([
                         html.Div("Live Total", className="label"),
-                        dbc.Input(id="live_total", type="number"),
+                        dbc.Input(id="live_total", type="number", placeholder="-"),
                     ], className="mb-3"),
                     
                     dbc.Row([
                         dbc.Col([
                             html.Div("Minutes", className="label"),
-                            dbc.Input(id="mins_left", type="number", min=0)
+                            dbc.Input(id="mins_left", type="number", placeholder="-", min=0)
                         ], width=6),
                         dbc.Col([
                             html.Div("Seconds", className="label"),
-                            dbc.Input(id="secs_left", type="number", min=0, max=59)
+                            dbc.Input(id="secs_left", type="number", placeholder="-", min=0, max=59)
                         ], width=6),
                     ], className="mb-4"),
                     
                     html.Div([
                         html.Div("Your Under (optional)", className="label"),
-                        dbc.Input(id="my_bet", type="number"),
+                        dbc.Input(id="my_bet", type="number", placeholder="-"),
                     ], className="mb-4"),
                     
                     html.Div([
@@ -1399,6 +843,7 @@ def create_fade_tab():
                                 id="live_analysis_games_input",
                                 type="text",
                                 value="5",
+                                placeholder="5",
                                 style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.85rem"}
                             ),
                             dbc.InputGroupText("games", style={
@@ -1442,6 +887,7 @@ def create_analysis_tab():
                             dcc.Dropdown(
                                 id="team1_selector",
                                 options=[],
+                                placeholder="Select Team 1...",
                                 clearable=True,
                                 searchable=True,
                                 className="dark-dropdown"
@@ -1451,6 +897,7 @@ def create_analysis_tab():
                             dcc.Dropdown(
                                 id="team2_selector", 
                                 options=[],
+                                placeholder="Select Team 2...",
                                 clearable=True,
                                 searchable=True,
                                 className="dark-dropdown"
@@ -1468,6 +915,7 @@ def create_analysis_tab():
                                     id="games_count_input",
                                     type="text",
                                     value="5",
+                                    placeholder="5",
                                     style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.9rem"}
                                 ),
                                 dbc.InputGroupText("games", style={
@@ -1527,16 +975,10 @@ def update_periods(gl):
 def adj_scores(inc, dec, t1, t2):
     if not ctx.triggered_id: raise dash.exceptions.PreventUpdate
     t = ctx.triggered_id
-    # Don't force "0" to appear - keep inputs clean
-    t1 = t1 if t1 is not None else None
-    t2 = t2 if t2 is not None else None
+    t1, t2 = t1 or 0, t2 or 0
     d = 1 if t["type"] == "inc" else -1
-    if t["index"] == "team1": 
-        t1 = max(0, (t1 or 0) + d)
-        t1 = None if t1 == 0 else t1  # Don't show 0
-    elif t["index"] == "team2": 
-        t2 = max(0, (t2 or 0) + d)  
-        t2 = None if t2 == 0 else t2  # Don't show 0
+    if t["index"] == "team1": t1 = max(0, t1 + d)
+    elif t["index"] == "team2": t2 = max(0, t2 + d)
     return t1, t2
 
 
@@ -1546,6 +988,7 @@ def adj_scores(inc, dec, t1, t2):
     Output("today_games_data", "data"),
     Output("tomorrow_games_data", "data"),
     Output("week_games_data", "data"),
+    Output("betting_odds_data", "data"),
     Input("refresh_games", "n_intervals")
 )
 def refresh_all_games(n):
@@ -1566,7 +1009,16 @@ def refresh_all_games(n):
         games = fetch_games_by_date(date_str)
         week_games.extend(games)
     
-    return live_games, today_games, tomorrow_games, week_games
+    # Fetch betting odds
+    try:
+        odds_games = get_basketball_odds()
+        betting_data = extract_betting_totals(odds_games)
+        print(f"📊 Matched {len(betting_data)} games with betting lines")
+    except Exception as e:
+        print(f"❌ Error fetching odds: {e}")
+        betting_data = {}
+    
+    return live_games, today_games, tomorrow_games, week_games, betting_data
 
 # Modal Callbacks
 @app.callback(
@@ -1750,23 +1202,19 @@ def auto_fill_from_game(game_data):
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
-    # Extract scores from ESPN data structure - only fill if there's actual data
-    home_score = game_data.get('home_score')
-    away_score = game_data.get('away_score')
-    
-    # Don't show "0" unless it's an actual score from live game
-    if home_score == 0 and not game_data.get('is_live'):
-        home_score = None
-    if away_score == 0 and not game_data.get('is_live'):
-        away_score = None
+    # Extract scores from ESPN data structure
+    home_score = game_data.get('home_score', 0)
+    away_score = game_data.get('away_score', 0)
     
     # Parse time from clock (e.g., "12:34" or "12:34.5")
-    minutes_left = None
-    seconds_left = None
+    minutes_left = 0
+    seconds_left = 0
     
     if game_data.get('is_live') and game_data.get('clock'):
         try:
             clock = game_data.get('clock', '0:00')
+            period = game_data.get('period', 2)  # Default to 2nd half if unknown
+            
             if ':' in clock:
                 time_parts = clock.split(':')
                 minutes_left = int(time_parts[0])
@@ -1774,18 +1222,18 @@ def auto_fill_from_game(game_data):
                 seconds_part = time_parts[1].split('.')[0]  # Remove decimal part
                 seconds_left = int(seconds_part)
                 
-                # Only show 0 minutes/seconds if it's actually from live game
-                if minutes_left == 0 and seconds_left == 0:
-                    minutes_left = 0  # Game actually at 0:00
-                    seconds_left = 0
+                # Automatically convert first half time to full game time remaining
+                if period == 1:  # First half - add 20 minutes for entire second half
+                    original_mins = minutes_left
+                    minutes_left += 20
+                    print(f"DEBUG: First half auto-fill conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
+                # If period == 2 (second half), leave as is
         except (ValueError, IndexError):
-            minutes_left = None
-            seconds_left = None
+            minutes_left = 0
+            seconds_left = 0
     
     # Calculate live total
-    live_total = None
-    if home_score is not None and away_score is not None:
-        live_total = home_score + away_score
+    live_total = home_score + away_score if (home_score and away_score) else None
     
     print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, total:{live_total}, mins:{minutes_left}, secs:{seconds_left}")
     
@@ -1804,10 +1252,9 @@ def auto_fill_from_game(game_data):
     Input("period_type", "value"), Input("threshold_slider", "value")
 )
 def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
-    # Handle None values for calculation without forcing UI display
-    mins_calc = mins if mins is not None else 0
-    secs_calc = secs if secs is not None else 0
-    min_left = mins_calc + secs_calc / 60
+    mins = mins or 0
+    secs = secs or 0
+    min_left = mins + secs / 60
     
     if None in [t1, t2, live_total, period] or min_left <= 0:
         return html.Div([
@@ -1977,9 +1424,10 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
      Output("analysis_controls", "style")],
     [Input("persistent_game_selection", "data"),
      Input("live_analysis_games_input", "value")],
+    [State("betting_odds_data", "data")],
     prevent_initial_call=True
 )
-def update_team_context(selected_game_data, games_count):
+def update_team_context(selected_game_data, games_count, betting_odds_data):
     """Show team analysis context for selected game"""
     try:
         if not selected_game_data:
@@ -2033,6 +1481,15 @@ def update_team_context(selected_game_data, games_count):
         
         # Calculate implied total
         implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
+        implied_total_per_min = implied_total / 40
+        
+        # Get betting line for this matchup
+        betting_info = None
+        if betting_odds_data:
+            # Try to match with betting data using team names
+            match_key1 = f"{away_team_name}|{home_team_name}"
+            match_key2 = f"{home_team_name}|{away_team_name}"
+            betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
         
         return html.Div([
         html.Div([
@@ -2056,18 +1513,29 @@ def update_team_context(selected_game_data, games_count):
             dbc.Row([
                 dbc.Col([
                     html.Div([
-                        html.Div("Projected Total", className="metric-label"),
-                        html.Div(f"{implied_total:.1f}", 
-                                style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
+                        html.Div("Projected Total pts/min", className="metric-label"),
+                        html.Div(f"{implied_total_per_min:.2f}", 
+                                style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
                     ])
-                ], className="text-center", width=6),
+                ], className="text-center", width=4),
                 dbc.Col([
                     html.Div([
-                        html.Div("Avg Scoring", className="metric-label"),
-                        html.Div(f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}", 
-                                style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#d4d4d8", "lineHeight": "1"})
+                        html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
+                        html.Div(f"{betting_info['avg_total']:.1f}" if betting_info else "No Line", 
+                                style={"fontSize": "1.6rem", "fontWeight": "700", 
+                                      "color": "#10d9c4" if betting_info else "#71717a", "lineHeight": "1"})
                     ])
-                ], className="text-center", width=6),
+                ], className="text-center", width=4),
+                dbc.Col([
+                    html.Div([
+                        html.Div("Line pts/min" if betting_info else "Avg Scoring", className="metric-label"),
+                        html.Div(
+                            f"{(betting_info['avg_total'] / 40):.2f}" if betting_info 
+                            else f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}",
+                            style={"fontSize": "1.6rem" if betting_info else "1.2rem", "fontWeight": "700" if betting_info else "600", 
+                                   "color": "#10d9c4" if betting_info else "#d4d4d8", "lineHeight": "1"})
+                    ])
+                ], className="text-center", width=4),
             ], className="mb-4"),
             
             # Team Cards
@@ -2086,7 +1554,13 @@ def update_team_context(selected_game_data, games_count):
                             ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
                             html.Div(f"{away_stats['avg_team_score']:.1f}", 
                                     style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.75rem"}),
+                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.5rem"}),
+                            
+                            html.Div([
+                                html.Span(f"{away_stats['avg_points_per_minute']:.2f}", 
+                                         style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
+                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#71717a", "marginLeft": "2px"})
+                            ], className="mb-2"),
                             
                             html.Div([
                                 html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
@@ -2134,7 +1608,13 @@ def update_team_context(selected_game_data, games_count):
                             ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
                             html.Div(f"{home_stats['avg_team_score']:.1f}", 
                                     style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#34d399", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.75rem"}),
+                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.5rem"}),
+                            
+                            html.Div([
+                                html.Span(f"{home_stats['avg_points_per_minute']:.2f}", 
+                                         style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
+                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#71717a", "marginLeft": "2px"})
+                            ], className="mb-2"),
                             
                             html.Div([
                                 html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
@@ -2173,6 +1653,9 @@ def update_team_context(selected_game_data, games_count):
     Output("games-display", "children"),
     Output("team1_selector", "options"),
     Output("team2_selector", "options"),
+    Output("today-btn", "color"),
+    Output("tomorrow-btn", "color"),
+    Output("week-btn", "color"),
     Input("today-btn", "n_clicks"),
     Input("tomorrow-btn", "n_clicks"),
     Input("week-btn", "n_clicks"),
@@ -2180,26 +1663,27 @@ def update_team_context(selected_game_data, games_count):
     State("today_games_data", "data"),
     State("tomorrow_games_data", "data"),
     State("week_games_data", "data"),
+    State("betting_odds_data", "data"),
     prevent_initial_call=True
 )
-def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab, today_games, tomorrow_games, week_games):
-    """Update games display based on button selection or auto-load Today when tab opens"""
+def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab, today_games, tomorrow_games, week_games, betting_odds_data):
+    """Update games display and button states based on selection or auto-load Today when tab opens"""
     ctx_triggered = ctx.triggered[0]['prop_id'] if ctx.triggered else ''
     
-    # Auto-load Today's games when Research tab is opened
-    if 'main-tabs' in ctx_triggered and active_tab == "analysis-tab":
-        games_to_show = today_games or []
-        title = "Today's Games"
-    # Handle button clicks
-    elif 'tomorrow-btn' in ctx_triggered:
+    # Determine which button should be selected and what data to show
+    if 'tomorrow-btn' in ctx_triggered:
         games_to_show = tomorrow_games or []
         title = "Tomorrow's Games"
+        button_colors = ("secondary", "primary", "secondary")  # Today, Tomorrow, Week
     elif 'week-btn' in ctx_triggered:
         games_to_show = week_games or []
         title = "This Week's Games"
+        button_colors = ("secondary", "secondary", "primary")
     else:
+        # Default to Today (including when Research tab opens)
         games_to_show = today_games or []
         title = "Today's Games"
+        button_colors = ("primary", "secondary", "secondary")
     
     if not games_to_show:
         games_content = html.Div([
@@ -2207,6 +1691,12 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab,
                    className="text-center text-muted py-4")
         ])
         team_options = []
+        return (dbc.CardBody(games_content), 
+                team_options, 
+                team_options, 
+                button_colors[0],  # Today button color
+                button_colors[1],  # Tomorrow button color  
+                button_colors[2])  # Week button color
     else:
         games_content = html.Div([
             html.Div([
@@ -2216,7 +1706,7 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab,
             ], className="mb-3"),
             
             html.Div([
-                create_game_card(game) for game in games_to_show
+                create_game_card(game, betting_odds_data) for game in games_to_show
             ], style={"maxHeight": "500px", "overflowY": "auto"})  # Add scroll for many games
         ])
         
@@ -2233,7 +1723,12 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab,
         # Sort team options alphabetically for easier searching
         team_options.sort(key=lambda x: x['label'])
     
-    return dbc.CardBody(games_content), team_options, team_options
+    return (dbc.CardBody(games_content), 
+            team_options, 
+            team_options, 
+            button_colors[0],  # Today button color
+            button_colors[1],  # Tomorrow button color  
+            button_colors[2])  # Week button color
 
 # Auto-populate team selectors when game is clicked
 @app.callback(
@@ -2275,7 +1770,7 @@ def populate_teams_from_game_click(game_clicks, today_games, tomorrow_games, wee
     
     return away_team_id, home_team_id  # Team 1 = Away, Team 2 = Home
 
-def create_game_card(game):
+def create_game_card(game, betting_odds_data=None):
     """Create a clickable card for displaying game information"""
     status_color = "#4ade80" if game['is_live'] else "#71717a" if game['state'] == 'pre' else "#f87171"
     status_text = "LIVE" if game['is_live'] else "UPCOMING" if game['state'] == 'pre' else "FINAL"
@@ -2289,6 +1784,21 @@ def create_game_card(game):
     else:
         score_display = "@"  # Use @ for upcoming games
         total_score = None
+    
+    # Get betting total from odds data
+    betting_total = None
+    if betting_odds_data:
+        # Try to match with betting data using the correct key format
+        away_team = game.get('away_team', '')
+        home_team = game.get('home_team', '')
+        
+        # Try both possible key combinations  
+        game_key1 = f"{away_team}|{home_team}"
+        game_key2 = f"{home_team}|{away_team}"
+        
+        betting_info = betting_odds_data.get(game_key1) or betting_odds_data.get(game_key2)
+        if betting_info:
+            betting_total = betting_info.get('avg_total')
     
     # Parse game time for upcoming games
     time_display = game['clock']
@@ -2334,9 +1844,9 @@ def create_game_card(game):
             ], width=7),
             dbc.Col([
                 html.Div([
-                    html.Span("Total: ", style={"fontSize": "0.7rem", "color": "#666"}),
-                    html.Span(str(total_score) if total_score is not None else "—", 
-                             style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#f59e0b"})
+                    html.Span("Line: " if betting_total else "Total: ", style={"fontSize": "0.7rem", "color": "#666"}),
+                    html.Span(str(betting_total) if betting_total else (str(total_score) if total_score is not None else "—"), 
+                             style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#10d9c4" if betting_total else "#f59e0b"})
                 ], className="text-right")
             ], width=5)
         ])
@@ -2373,11 +1883,15 @@ def get_team_stats(team_id, num_games=10):
         home_avg = sum(g['team_score'] for g in home_games) / len(home_games) if home_games else 0
         away_avg = sum(g['team_score'] for g in away_games) / len(away_games) if away_games else 0
         
+        # Calculate points per minute (PPG / 40)
+        avg_points_per_minute = avg_team_score / 40
+        
         return {
             'recent_games': recent_games,
             'avg_team_score': avg_team_score,
             'avg_opp_score': avg_opp_score,
             'avg_total': avg_total,
+            'avg_points_per_minute': avg_points_per_minute,
             'home_avg': home_avg,
             'away_avg': away_avg,
             'home_games': len(home_games),
@@ -2420,9 +1934,10 @@ def update_games_count_display(games_count):
     Input("team2_selector", "value"),
     Input("games_count_input", "value"),
     State("team1_selector", "options"),
-    State("team2_selector", "options")
+    State("team2_selector", "options"),
+    State("betting_odds_data", "data")
 )
-def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options):
+def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options, betting_odds_data):
     """Update team comparison analysis display"""
     if not team1_id and not team2_id:
         return dbc.CardBody([
@@ -2462,14 +1977,37 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
     # If both teams selected, show head-to-head comparison
     if team1_stats and team2_stats:
         implied_total = team1_stats['avg_team_score'] + team2_stats['avg_team_score']
+        implied_total_per_min = implied_total / 40
+        
+        # Get betting line for this matchup
+        betting_info = None
+        if betting_odds_data and team1_name and team2_name:
+            # Try both possible key combinations
+            match_key1 = f"{team1_name}|{team2_name}"
+            match_key2 = f"{team2_name}|{team1_name}"
+            betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
         
         comparison_content.extend([
             html.Div([
                 html.H6("Team Comparison", style={"color": "#e5e5e5", "textAlign": "center"}),
-                html.Div([
-                    html.Span("Implied Total: ", style={"fontSize": "0.9rem", "color": "#666"}),
-                    html.Span(f"{implied_total:.1f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
-                ], className="text-center mb-4")
+                
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.Div("Projected Total pts/min", className="metric-label"),
+                            html.Div(f"{implied_total_per_min:.2f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
+                        ])
+                    ], className="text-center", width=6),
+                    dbc.Col([
+                        html.Div([
+                            html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
+                            html.Div(
+                                f"{betting_info['avg_total']:.1f} ({betting_info['avg_total'] / 40:.2f} pts/min)" if betting_info else "No Line", 
+                                style={"fontSize": "1.4rem", "fontWeight": "700", 
+                                       "color": "#10d9c4" if betting_info else "#71717a"})
+                        ])
+                    ], className="text-center", width=6),
+                ], className="mb-4")
             ]),
             
             dbc.Row([
@@ -2484,6 +2022,9 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team1_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#4ade80", "textAlign": "center"}),
+                    html.Div("PTS/MIN", className="metric-label text-center mt-2"),
+                    html.Div(f"{team1_stats['avg_points_per_minute']:.2f}", 
+                            style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b", "textAlign": "center"}),
                     html.Div("vs OPP", className="metric-label text-center mt-2"),
                     html.Div(f"{team1_stats['avg_opp_score']:.1f}", 
                             style={"fontSize": "1.2rem", "color": "#f87171", "textAlign": "center"}),
@@ -2506,6 +2047,9 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team2_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#3b82f6", "textAlign": "center"}),
+                    html.Div("PTS/MIN", className="metric-label text-center mt-2"),
+                    html.Div(f"{team2_stats['avg_points_per_minute']:.2f}", 
+                            style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b", "textAlign": "center"}),
                     html.Div("vs OPP", className="metric-label text-center mt-2"),
                     html.Div(f"{team2_stats['avg_opp_score']:.1f}", 
                             style={"fontSize": "1.2rem", "color": "#f87171", "textAlign": "center"}),
@@ -2546,6 +2090,11 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                 dbc.Col([
                     html.Div("TOTAL PPG", className="metric-label"),
                     html.Div(f"{team_stats['avg_total']:.1f}", 
+                            style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#f59e0b"})
+                ], className="text-center"),
+                dbc.Col([
+                    html.Div("PTS/MIN", className="metric-label"),
+                    html.Div(f"{team_stats['avg_points_per_minute']:.2f}", 
                             style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#f59e0b"})
                 ], className="text-center"),
                 dbc.Col([
