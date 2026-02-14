@@ -1527,10 +1527,16 @@ def update_periods(gl):
 def adj_scores(inc, dec, t1, t2):
     if not ctx.triggered_id: raise dash.exceptions.PreventUpdate
     t = ctx.triggered_id
-    t1, t2 = t1 or 0, t2 or 0
+    # Don't force "0" to appear - keep inputs clean
+    t1 = t1 if t1 is not None else None
+    t2 = t2 if t2 is not None else None
     d = 1 if t["type"] == "inc" else -1
-    if t["index"] == "team1": t1 = max(0, t1 + d)
-    elif t["index"] == "team2": t2 = max(0, t2 + d)
+    if t["index"] == "team1": 
+        t1 = max(0, (t1 or 0) + d)
+        t1 = None if t1 == 0 else t1  # Don't show 0
+    elif t["index"] == "team2": 
+        t2 = max(0, (t2 or 0) + d)  
+        t2 = None if t2 == 0 else t2  # Don't show 0
     return t1, t2
 
 
@@ -1744,13 +1750,19 @@ def auto_fill_from_game(game_data):
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
-    # Extract scores from ESPN data structure
-    home_score = game_data.get('home_score', 0)
-    away_score = game_data.get('away_score', 0)
+    # Extract scores from ESPN data structure - only fill if there's actual data
+    home_score = game_data.get('home_score')
+    away_score = game_data.get('away_score')
+    
+    # Don't show "0" unless it's an actual score from live game
+    if home_score == 0 and not game_data.get('is_live'):
+        home_score = None
+    if away_score == 0 and not game_data.get('is_live'):
+        away_score = None
     
     # Parse time from clock (e.g., "12:34" or "12:34.5")
-    minutes_left = 0
-    seconds_left = 0
+    minutes_left = None
+    seconds_left = None
     
     if game_data.get('is_live') and game_data.get('clock'):
         try:
@@ -1761,12 +1773,19 @@ def auto_fill_from_game(game_data):
                 # Handle seconds with decimals
                 seconds_part = time_parts[1].split('.')[0]  # Remove decimal part
                 seconds_left = int(seconds_part)
+                
+                # Only show 0 minutes/seconds if it's actually from live game
+                if minutes_left == 0 and seconds_left == 0:
+                    minutes_left = 0  # Game actually at 0:00
+                    seconds_left = 0
         except (ValueError, IndexError):
-            minutes_left = 0
-            seconds_left = 0
+            minutes_left = None
+            seconds_left = None
     
     # Calculate live total
-    live_total = home_score + away_score if (home_score and away_score) else None
+    live_total = None
+    if home_score is not None and away_score is not None:
+        live_total = home_score + away_score
     
     print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, total:{live_total}, mins:{minutes_left}, secs:{seconds_left}")
     
@@ -1785,9 +1804,10 @@ def auto_fill_from_game(game_data):
     Input("period_type", "value"), Input("threshold_slider", "value")
 )
 def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
-    mins = mins or 0
-    secs = secs or 0
-    min_left = mins + secs / 60
+    # Handle None values for calculation without forcing UI display
+    mins_calc = mins if mins is not None else 0
+    secs_calc = secs if secs is not None else 0
+    min_left = mins_calc + secs_calc / 60
     
     if None in [t1, t2, live_total, period] or min_left <= 0:
         return html.Div([
