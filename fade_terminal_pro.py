@@ -289,6 +289,23 @@ app.index_string = '''
                 transform: translateY(-1px);
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             }
+            
+            /* Team Logos */
+            .team-logo {
+                object-fit: contain;
+                filter: brightness(0.95);
+                transition: all 0.2s ease;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 3px;
+            }
+            .team-logo:hover {
+                filter: brightness(1.1);
+                transform: scale(1.05);
+            }
+            /* Hide broken images */
+            .team-logo[src=""], .team-logo:not([src]) {
+                display: none;
+            }
         </style>
     </head>
     <body>
@@ -302,6 +319,38 @@ PERIOD_TIME_MAPS = {
     40: {'Q (10m)': 10, 'H (20m)': 20, 'FG (40m)': 40},
     48: {'Q (12m)': 12, 'H (24m)': 24, 'FG (48m)': 48}
 }
+
+def get_team_logo_url(team_data):
+    """Get team logo URL from ESPN data with fallback options"""
+    if not team_data:
+        return ''
+    
+    # Try multiple possible logo fields from ESPN
+    logo_fields = ['logo', 'logos', 'logoDark', 'logoLight']
+    
+    for field in logo_fields:
+        logo_data = team_data.get(field)
+        if logo_data:
+            # Handle both string URLs and logo objects
+            if isinstance(logo_data, str):
+                return logo_data
+            elif isinstance(logo_data, list) and len(logo_data) > 0:
+                # Take first logo if it's a list
+                logo_item = logo_data[0]
+                if isinstance(logo_item, dict):
+                    return logo_item.get('href', logo_item.get('url', ''))
+                elif isinstance(logo_item, str):
+                    return logo_item
+            elif isinstance(logo_data, dict):
+                return logo_data.get('href', logo_data.get('url', ''))
+    
+    # ESPN fallback URL pattern (common for college basketball)
+    team_id = team_data.get('id')
+    if team_id:
+        # ESPN's standard logo URL pattern
+        return f"https://a.espncdn.com/i/teamlogos/ncaa/500/{team_id}.png"
+    
+    return ''
 
 def fetch_games_by_date(date_str=None):
     """Fetch college basketball games from ESPN's internal API for a specific date"""
@@ -331,12 +380,27 @@ def fetch_games_by_date(date_str=None):
             
             state = status.get('type', {}).get('state', '')
             
+            # Extract team logos from ESPN data
+            home_team_data = home_team.get('team', {})
+            away_team_data = away_team.get('team', {})
+            
+            # Debug: Print available team data keys (remove after testing)
+            if len(games) == 0:  # Only print for first game to avoid spam
+                print(f"DEBUG: Home team data keys: {list(home_team_data.keys())}")
+                if 'logos' in home_team_data:
+                    print(f"DEBUG: Home team logos: {home_team_data.get('logos')}")
+                if 'logo' in home_team_data:
+                    print(f"DEBUG: Home team logo: {home_team_data.get('logo')}")
+                print(f"DEBUG: Away team data keys: {list(away_team_data.keys())}")
+            
             game_info = {
                 'id': event.get('id'),
-                'home_team': home_team.get('team', {}).get('displayName', 'Home'),
-                'away_team': away_team.get('team', {}).get('displayName', 'Away'),
-                'home_team_id': home_team.get('team', {}).get('id'),
-                'away_team_id': away_team.get('team', {}).get('id'),
+                'home_team': home_team_data.get('displayName', 'Home'),
+                'away_team': away_team_data.get('displayName', 'Away'),
+                'home_team_id': home_team_data.get('id'),
+                'away_team_id': away_team_data.get('id'),
+                'home_team_logo': get_team_logo_url(home_team_data),
+                'away_team_logo': get_team_logo_url(away_team_data),
                 'home_score': int(home_team.get('score', 0)),
                 'away_score': int(away_team.get('score', 0)),
                 'status_text': status.get('type', {}).get('detail', 'Pre-Game'),
@@ -887,7 +951,25 @@ def populate_game_modal(games_data):
         
         card = html.Div([
             time_display,
-            html.Div(f"{game['away_team']} @ {game['home_team']}", className="game-matchup"),
+            html.Div([
+                # Away team with logo
+                html.Span([
+                    html.Img(src=game.get('away_team_logo', ''), 
+                            style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "3px", "verticalAlign": "middle"},
+                            className="team-logo") if game.get('away_team_logo') else None,
+                    html.Span(game['away_team'], style={"verticalAlign": "middle"})
+                ], style={"display": "inline-flex", "alignItems": "center"}),
+                
+                html.Span(" @ ", style={"margin": "0 8px", "color": "#666"}),
+                
+                # Home team with logo  
+                html.Span([
+                    html.Img(src=game.get('home_team_logo', ''), 
+                            style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "3px", "verticalAlign": "middle"},
+                            className="team-logo") if game.get('home_team_logo') else None,
+                    html.Span(game['home_team'], style={"verticalAlign": "middle"})
+                ], style={"display": "inline-flex", "alignItems": "center"})
+            ], className="game-matchup", style={"display": "flex", "alignItems": "center"}),
             html.Div(details, className="game-details")
         ], className="game-card", id={"type": "game-card", "index": i}, n_clicks=0)
         
@@ -1263,12 +1345,20 @@ def update_team_context(selected_game_data, games_count):
         
         return html.Div([
         html.Div([
-            # Clean Header
+            # Clean Header with Team Logos
             html.Div([
                 html.H5("Matchup Intelligence", 
                        style={"color": "#f4f4f5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
-                html.P(f"{away_team_name} @ {home_team_name}", 
-                      style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0"})
+                html.Div([
+                    html.Img(src=selected_game_data.get('away_team_logo', ''), 
+                            style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "2px"},
+                            className="team-logo") if selected_game_data.get('away_team_logo') else None,
+                    html.Span(f"{away_team_name} @ ", style={"color": "#60a5fa"}),
+                    html.Img(src=selected_game_data.get('home_team_logo', ''), 
+                            style={"width": "20px", "height": "20px", "margin": "0 6px", "borderRadius": "2px"},
+                            className="team-logo") if selected_game_data.get('home_team_logo') else None,
+                    html.Span(home_team_name, style={"color": "#34d399"})
+                ], style={"display": "flex", "alignItems": "center", "fontSize": "0.9rem", "margin": "0"})
             ], style={"marginBottom": "1.5rem"}),
             
             # Key Metrics Row
@@ -1295,8 +1385,14 @@ def update_team_context(selected_game_data, games_count):
                 dbc.Col([
                     html.Div([
                         html.Div([
-                            html.H6(away_team_name[:18] + "..." if len(away_team_name) > 18 else away_team_name, 
-                                   style={"color": "#60a5fa", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
+                            # Team logo and name
+                            html.Div([
+                                html.Img(src=selected_game_data.get('away_team_logo', ''), 
+                                        style={"width": "24px", "height": "24px", "marginRight": "8px", "borderRadius": "3px"},
+                                        className="team-logo") if selected_game_data.get('away_team_logo') else None,
+                                html.H6(away_team_name[:18] + "..." if len(away_team_name) > 18 else away_team_name, 
+                                       style={"color": "#60a5fa", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0", "display": "inline"})
+                            ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
                             html.Div(f"{away_stats['avg_team_score']:.1f}", 
                                     style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"}),
                             html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.75rem"}),
@@ -1337,8 +1433,14 @@ def update_team_context(selected_game_data, games_count):
                 dbc.Col([
                     html.Div([
                         html.Div([
-                            html.H6(home_team_name[:18] + "..." if len(home_team_name) > 18 else home_team_name,
-                                   style={"color": "#34d399", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
+                            # Team logo and name
+                            html.Div([
+                                html.Img(src=selected_game_data.get('home_team_logo', ''), 
+                                        style={"width": "24px", "height": "24px", "marginRight": "8px", "borderRadius": "3px"},
+                                        className="team-logo") if selected_game_data.get('home_team_logo') else None,
+                                html.H6(home_team_name[:18] + "..." if len(home_team_name) > 18 else home_team_name,
+                                       style={"color": "#34d399", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0", "display": "inline"})
+                            ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
                             html.Div(f"{home_stats['avg_team_score']:.1f}", 
                                     style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#34d399", "lineHeight": "1"}),
                             html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.75rem"}),
@@ -1508,10 +1610,24 @@ def create_game_card(game):
                     html.Span(f"  {time_display}", style={"fontSize": "0.7rem", "color": "#666", "marginLeft": "8px"})
                 ]),
                 html.Div([
-                    html.Span(game['away_team'], style={"fontSize": "0.85rem", "color": "#e5e5e5"}),
+                    # Away team with logo
+                    html.Span([
+                        html.Img(src=game.get('away_team_logo', ''), 
+                                style={"width": "16px", "height": "16px", "marginRight": "4px", "borderRadius": "2px", "verticalAlign": "middle"},
+                                className="team-logo") if game.get('away_team_logo') else None,
+                        html.Span(game['away_team'], style={"fontSize": "0.85rem", "color": "#e5e5e5", "verticalAlign": "middle"})
+                    ], style={"display": "inline-flex", "alignItems": "center"}),
+                    
                     html.Span(f" {score_display} ", style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#fff", "margin": "0 6px"}),
-                    html.Span(game['home_team'], style={"fontSize": "0.85rem", "color": "#e5e5e5"})
-                ]),
+                    
+                    # Home team with logo
+                    html.Span([
+                        html.Img(src=game.get('home_team_logo', ''), 
+                                style={"width": "16px", "height": "16px", "marginRight": "4px", "borderRadius": "2px", "verticalAlign": "middle"},
+                                className="team-logo") if game.get('home_team_logo') else None,
+                        html.Span(game['home_team'], style={"fontSize": "0.85rem", "color": "#e5e5e5", "verticalAlign": "middle"})
+                    ], style={"display": "inline-flex", "alignItems": "center"})
+                ], style={"display": "flex", "alignItems": "center"}),
                 html.Div([
                     html.Span("Click to analyze teams →", style={"fontSize": "0.65rem", "color": "#4a5568", "fontStyle": "italic"})
                 ], style={"marginTop": "4px"})
