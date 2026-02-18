@@ -4,13 +4,15 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import requests
 from datetime import datetime, timedelta, timezone
+import json
 
 ODDS_API_KEY = 'c352f4d244a2a3ae32f32136f8d908ac'
 ODDS_BASE_URL = 'https://api.the-odds-api.com/v4'
 
 app = dash.Dash(__name__, external_stylesheets=[
     dbc.themes.BOOTSTRAP,
-    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
 ], suppress_callback_exceptions=True)
 
 def convert_utc_to_est(utc_time_str):
@@ -19,6 +21,12 @@ def convert_utc_to_est(utc_time_str):
         # Parse UTC time from ESPN API
         dt_utc = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
         
+        # Convert to Eastern Time (automatically handles EST/EDT based on date)
+        # During standard time: UTC-5 (EST)
+        # During daylight time: UTC-4 (EDT)
+        
+        # Simple DST check: 2nd Sunday in March to 1st Sunday in November
+        # For basketball season (Nov-April), mostly EST except March games
         year = dt_utc.year
         
         # Approximate DST dates (this covers most cases accurately)
@@ -49,427 +57,948 @@ app.index_string = '''
 <html>
     <head>
         {%metas%}
-        <title>Fade System</title>
+        <title>CBB Fade Terminal • v2.0</title>
         {%favicon%}
         {%css%}
         <style>
+            /* =====================================================
+               CBB FADE TERMINAL v2.1 - USER-FRIENDLY DESIGN
+               Modern Sports Analytics Dashboard
+            ===================================================== */
+            
+            :root {
+                /* Enhanced Color Palette */
+                --void: #050609;
+                --primary: #0a0d12;
+                --secondary: #0f1419;
+                --tertiary: #141922;
+                
+                /* Glassmorphic Surfaces */
+                --glass-primary: rgba(15, 20, 30, 0.85);
+                --glass-secondary: rgba(25, 35, 45, 0.75);
+                --glass-tertiary: rgba(35, 45, 55, 0.65);
+                
+                /* Status Colors */
+                --live-color: #10b981;
+                --upcoming-color: #f59e0b;
+                --final-color: #6b7280;
+                --fade-opportunity: #ef4444;
+                
+                /* Premium Accents */
+                --cyan: #00d4ff;
+                --violet: #8b5cf6;
+                --emerald: #10b981;
+                --amber: #f59e0b;
+                --rose: #f43f5e;
+                
+                /* Typography */
+                --text-primary: #ffffff;
+                --text-secondary: #a1a1aa;
+                --text-tertiary: #71717a;
+                
+                /* Interactive Elements */
+                --hover-bg: rgba(255, 255, 255, 0.05);
+                --active-bg: rgba(0, 212, 255, 0.1);
+                --border-color: rgba(255, 255, 255, 0.1);
+                
+                /* Shadows */
+                --shadow-cyan: 0 2px 8px rgba(0, 212, 255, 0.15);
+                --shadow-emerald: 0 2px 8px rgba(16, 185, 129, 0.15);
+                --shadow-amber: 0 2px 8px rgba(245, 158, 11, 0.15);
+                --shadow-violet: 0 2px 8px rgba(139, 92, 246, 0.15);
+                
+                /* Depth & Shadows */
+                --shadow-void: 0 0 80px rgba(0, 0, 0, 0.9);
+                --shadow-deep: 0 25px 80px rgba(0, 0, 0, 0.6);
+                --shadow-mid: 0 15px 50px rgba(0, 0, 0, 0.4);
+                --shadow-soft: 0 8px 25px rgba(0, 0, 0, 0.3);
+                
+                /* Borders */
+                --border-primary: rgba(255, 255, 255, 0.12);
+                --border-secondary: rgba(255, 255, 255, 0.06);
+                --border-accent: rgba(0, 212, 255, 0.2);
+                
+                /* Animation Curves */
+                --ease: cubic-bezier(0.4, 0, 0.2, 1);
+                --bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+                --swift: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            }
+            
+            * {
+                box-sizing: border-box;
+            }
+            
             body {
-                background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-                font-family: 'Inter', sans-serif;
-                color: #e2e8f0;
+                background: 
+                    radial-gradient(ellipse at top, rgba(0, 212, 255, 0.03) 0%, transparent 50%),
+                    radial-gradient(ellipse at bottom, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
+                    linear-gradient(180deg, var(--void) 0%, var(--primary) 40%, var(--secondary) 100%);
+                background-attachment: fixed;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                color: var(--text-primary);
                 font-weight: 400;
+                line-height: 1.6;
+                overflow-x: hidden;
+                min-height: 100vh;
             }
             .card {
-                background: rgba(26, 32, 44, 0.8);
-                border: 1px solid rgba(74, 85, 104, 0.3);
-                border-radius: 12px;
-                backdrop-filter: blur(8px);
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+                background: var(--glass-primary);
+                border: 1px solid var(--border-primary);
+                border-radius: 20px;
+                backdrop-filter: blur(20px) saturate(120%);
+                box-shadow: var(--shadow-deep), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                position: relative;
+                overflow: hidden;
+                transition: all 0.4s var(--ease);
+            }
+            
+            .card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 1px;
+                background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+                opacity: 0.6;
+            }
+            
+            .card:hover {
+                border-color: var(--border-accent);
+                box-shadow: var(--shadow-mid);
             }
             .form-control {
-                background: rgba(26, 32, 44, 0.7) !important;
-                border: 1px solid rgba(74, 85, 104, 0.4) !important;
-                color: #e2e8f0 !important;
-                font-weight: 400;
-                border-radius: 6px !important;
-                font-size: 0.9rem;
-                padding: 0.6rem 0.8rem;
-                transition: all 0.2s ease;
-            }
-            .form-control:focus {
-                border-color: #4a5568 !important;
-                box-shadow: 0 0 0 2px rgba(74, 85, 104, 0.2) !important;
-            }
-            .form-control::placeholder { color: #718096 !important; }
-            .btn-adj {
-                background: rgba(74, 85, 104, 0.15) !important;
-                border: 1px solid rgba(74, 85, 104, 0.2) !important;
-                color: #a0aec0 !important;
+                background: var(--glass-secondary) !important;
+                border: 1px solid var(--border-primary) !important;
+                color: var(--text-primary) !important;
+                font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
                 font-weight: 500;
-                border-radius: 4px;
-                transition: all 0.2s ease;
-                font-size: 0.8rem;
-                padding: 0.25rem 0.5rem;
-                min-width: 32px;
+                border-radius: 12px !important;
+                font-size: 0.9rem;
+                padding: 0.8rem 1rem;
+                transition: all 0.3s var(--ease);
+                backdrop-filter: blur(15px);
+                position: relative;
             }
-            .btn-adj:hover { 
-                background: rgba(74, 85, 104, 0.25) !important; 
-                color: #e2e8f0 !important;
-                border-color: rgba(74, 85, 104, 0.3) !important;
+            
+            .form-control:focus {
+                border-color: var(--border-accent) !important;
+                box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1) !important;
+                background: var(--glass-primary) !important;
             }
-            .btn-adj:active {
-                background: rgba(74, 85, 104, 0.35) !important;
-                transform: scale(0.95);
+            
+            .form-control:hover {
+                border-color: var(--border-accent) !important;
+                background: var(--glass-primary) !important;
             }
-            .btn-adj-small {
-                background: rgba(74, 85, 104, 0.1) !important;
-                border: 1px solid rgba(74, 85, 104, 0.15) !important;
-                color: #a0aec0 !important;
+            
+            .form-control::placeholder { 
+                color: var(--text-tertiary) !important; 
                 font-weight: 400;
-                border-radius: 3px;
-                transition: all 0.2s ease;
-                font-size: 0.7rem;
-                padding: 0.15rem 0.3rem;
-                min-width: 24px;
-                height: 28px;
             }
-            .btn-adj-small:hover { 
-                background: rgba(74, 85, 104, 0.2) !important; 
-                color: #e2e8f0 !important;
-                border-color: rgba(74, 85, 104, 0.25) !important;
+            .btn-adj {
+                background: var(--glass-tertiary) !important;
+                border: 1px solid var(--border-primary) !important;
+                color: var(--text-secondary) !important;
+                font-family: 'JetBrains Mono', monospace;
+                font-weight: 600;
+                border-radius: 10px;
+                transition: all 0.25s var(--ease);
+                font-size: 0.85rem;
+                padding: 0.4rem 0.7rem;
+                min-width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+                backdrop-filter: blur(10px);
             }
-            .btn-adj-small:active {
-                background: rgba(74, 85, 104, 0.3) !important;
-                transform: scale(0.92);
+            
+            .btn-adj::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                background: linear-gradient(135deg, var(--cyan), var(--violet));
+                opacity: 0;
+                transition: opacity 0.25s var(--ease);
+                z-index: -1;
+            }
+            
+            .btn-adj:hover { 
+                color: var(--text-primary) !important;
+                border-color: var(--border-accent) !important;
+                background: var(--glass-secondary) !important;
+            }
+            
+            .btn-adj:hover::before {
+                opacity: 0.1;
+            }
+            
+            .btn-adj:active {
+                transform: translateY(0) scale(0.98);
+                box-shadow: var(--shadow-soft);
+            }
+            
+            /* Micro Buttons for Score Inputs */
+            .btn-micro {
+                background: var(--glass-tertiary) !important;
+                border: 1px solid var(--border-secondary) !important;
+                color: var(--text-tertiary) !important;
+                font-family: 'JetBrains Mono', monospace;
+                font-weight: 600;
+                border-radius: 6px !important;
+                font-size: 0.7rem !important;
+                padding: 0.2rem 0.4rem !important;
+                min-width: 28px !important;
+                height: 24px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                transition: all 0.2s var(--ease) !important;
+                opacity: 0.7;
+            }
+            
+            .btn-micro:hover {
+                color: var(--text-secondary) !important;
+                border-color: var(--border-primary) !important;
+                background: var(--glass-secondary) !important;
+                opacity: 1;
+            }
+            
+            .btn-micro:active {
+                transform: scale(0.95);
+                opacity: 0.8;
             }
             .label { 
                 font-size: 0.75rem; 
-                color: #a0aec0; 
+                color: var(--text-secondary); 
                 text-transform: uppercase; 
-                letter-spacing: 0.8px; 
-                margin-bottom: 0.5rem; 
-                font-weight: 500;
+                letter-spacing: 1.2px; 
+                margin-bottom: 0.6rem; 
+                font-weight: 600;
+                font-family: 'Inter', sans-serif;
+                position: relative;
+            }
+            
+            .label::after {
+                content: '';
+                position: absolute;
+                bottom: -2px;
+                left: 0;
+                width: 20px;
+                height: 1px;
+                background: linear-gradient(90deg, var(--cyan), transparent);
+                opacity: 0.5;
             }
             .output-card {
-                background: rgba(24, 24, 27, 0.9);
-                border: 1px solid rgba(39, 39, 42, 0.6);
-                border-radius: 20px;
-                backdrop-filter: blur(12px);
-                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+                background: var(--glass-primary);
+                border: 1px solid var(--border-primary);
+                border-radius: 24px;
+                backdrop-filter: blur(25px) saturate(200%);
+                box-shadow: var(--shadow-void), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .output-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: linear-gradient(90deg, 
+                    transparent, 
+                    var(--cyan), 
+                    var(--violet), 
+                    var(--emerald), 
+                    transparent
+                );
+                opacity: 0.6;
+            }
+            
+            .output-card::after {
+                content: '';
+                position: absolute;
+                inset: 1px;
+                border-radius: 23px;
+                background: linear-gradient(135deg, 
+                    rgba(0, 212, 255, 0.02), 
+                    rgba(139, 92, 246, 0.02)
+                );
+                pointer-events: none;
             }
             .metric-value { 
-                font-weight: 600;
-                font-size: 2rem;
-                letter-spacing: -0.02em;
-                line-height: 1;
+                font-family: 'JetBrains Mono', monospace;
+                font-weight: 700;
+                font-size: 2.2rem;
+                letter-spacing: -0.03em;
+                line-height: 0.9;
+                background: linear-gradient(135deg, var(--text-primary), var(--cyan));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                transition: all 0.3s var(--ease);
             }
+            
+            .metric-value:hover {
+                opacity: 0.9;
+            }
+            
             .metric-label {
                 font-size: 0.75rem;
-                font-weight: 500;
-                letter-spacing: 1px;
+                font-weight: 600;
+                letter-spacing: 1.5px;
                 text-transform: uppercase;
-                color: #a0aec0;
-                margin-bottom: 0.25rem;
+                color: var(--text-secondary);
+                margin-bottom: 0.4rem;
+                font-family: 'Inter', sans-serif;
+                position: relative;
+            }
+            
+            .metric-label::before {
+                content: '◦';
+                color: var(--cyan);
+                margin-right: 0.5rem;
+                opacity: 0.6;
             }
             .pro-card {
-                background: rgba(26, 32, 44, 0.9);
-                border: 1px solid rgba(74, 85, 104, 0.25);
-                border-radius: 12px;
-                padding: 1.5rem;
-                backdrop-filter: blur(10px);
-                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+                background: var(--glass-primary);
+                border: 1px solid var(--border-primary);
+                border-radius: 20px;
+                padding: 2rem;
+                backdrop-filter: blur(20px) saturate(120%);
+                box-shadow: var(--shadow-deep), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+                position: relative;
+                overflow: hidden;
+                transition: all 0.4s var(--ease);
             }
-            /* Professional Dropdown Styling */
+            
+            .pro-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 1px;
+                background: linear-gradient(90deg, 
+                    transparent, 
+                    var(--border-accent), 
+                    transparent
+                );
+                opacity: 0.7;
+            }
+            
+            .pro-card:hover {
+                border-color: var(--border-accent);
+            }
+            
+            .pro-card:hover::before {
+                opacity: 0.8;
+            }
+            /* Premium Dropdown System */
             .dark-dropdown .Select-control { 
-                background: rgba(26, 32, 44, 0.9) !important; 
-                border: 1px solid rgba(74, 85, 104, 0.4) !important; 
-                color: #e2e8f0 !important; 
-                border-radius: 8px !important;
-                min-height: 42px;
+                background: var(--glass-secondary) !important; 
+                border: 1px solid var(--border-primary) !important; 
+                color: var(--text-primary) !important; 
+                border-radius: 14px !important;
+                min-height: 48px;
                 font-size: 0.9rem;
-                font-family: 'SF Mono', Consolas, monospace;
+                font-family: 'JetBrains Mono', 'SF Mono', monospace;
                 font-weight: 500;
-                transition: all 0.2s ease;
+                transition: all 0.3s var(--ease);
+                backdrop-filter: blur(15px);
+                position: relative;
             }
+            
+            .dark-dropdown .Select-control::before {
+                content: '';
+                position: absolute;
+                inset: -1px;
+                border-radius: inherit;
+                background: linear-gradient(135deg, var(--cyan), var(--violet));
+                opacity: 0;
+                transition: opacity 0.3s var(--ease);
+                z-index: -1;
+            }
+            
             .dark-dropdown .Select-control:hover {
-                border-color: rgba(74, 85, 104, 0.6) !important;
-                background: rgba(26, 32, 44, 0.95) !important;
+                border-color: var(--border-accent) !important;
+                background: var(--glass-primary) !important;
+                transform: translateY(-1px);
+                box-shadow: var(--shadow-cyan);
             }
+            
+            .dark-dropdown .Select-control:hover::before {
+                opacity: 0.1;
+            }
+            
             .dark-dropdown .Select-placeholder { 
-                color: #718096 !important; 
+                color: var(--text-tertiary) !important; 
                 font-weight: 400; 
                 font-family: 'Inter', sans-serif;
             }
+            
             .dark-dropdown .Select-value-label { 
-                color: #f7fafc !important; 
-                font-weight: 500; 
-                font-family: 'SF Mono', Consolas, monospace;
+                color: var(--text-primary) !important; 
+                font-weight: 600; 
+                font-family: 'JetBrains Mono', monospace;
             }
+            
             .dark-dropdown .Select-input > input { 
-                color: #e2e8f0 !important; 
-                font-family: 'SF Mono', Consolas, monospace;
+                color: var(--text-primary) !important; 
+                font-family: 'JetBrains Mono', monospace;
             }
+            
             .dark-dropdown .Select-menu-outer { 
-                background: rgba(26, 32, 44, 0.98) !important; 
-                border: 1px solid rgba(74, 85, 104, 0.4) !important; 
-                border-radius: 8px !important;
-                backdrop-filter: blur(12px);
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-                max-height: 300px;
+                background: var(--glass-primary) !important; 
+                border: 1px solid var(--border-accent) !important; 
+                border-radius: 14px !important;
+                backdrop-filter: blur(25px) saturate(120%);
+                box-shadow: var(--shadow-deep);
+                max-height: 350px;
+                margin-top: 4px;
             }
+            
             .dark-dropdown .Select-menu { 
                 background: transparent !important;
-                max-height: 280px;
+                max-height: 320px;
             }
+            
             .dark-dropdown .Select-option { 
-                color: #cbd5e0 !important; 
+                color: var(--text-secondary) !important; 
                 background: transparent !important; 
-                padding: 12px 16px !important;
+                padding: 14px 18px !important;
                 font-size: 0.9rem;
-                font-family: 'SF Mono', Consolas, monospace;
+                font-family: 'JetBrains Mono', monospace;
                 font-weight: 500;
-                transition: all 0.15s ease;
+                transition: all 0.2s var(--ease);
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+                position: relative;
             }
+            
+            .dark-dropdown .Select-option::before {
+                content: '▸';
+                color: var(--cyan);
+                margin-right: 8px;
+                opacity: 0;
+                transition: opacity 0.2s var(--ease);
+            }
+            
             .dark-dropdown .Select-option.is-focused { 
-                background: rgba(74, 85, 104, 0.2) !important; 
-                color: #f7fafc !important; 
+                background: var(--glass-secondary) !important; 
+                color: var(--text-primary) !important;
+                transform: translateX(4px);
             }
+            
+            .dark-dropdown .Select-option.is-focused::before {
+                opacity: 1;
+            }
+            
             .dark-dropdown .Select-option.is-selected { 
-                background: rgba(74, 85, 104, 0.3) !important; 
-                color: #ffffff !important; 
+                background: var(--glass-tertiary) !important; 
+                color: var(--cyan) !important;
+                font-weight: 600;
             }
             
-            /* Professional Button Styling */
+            /* Premium Button System */
             .btn-primary {
-                background: #2d3748 !important;
-                border: none !important;
-                border-radius: 6px !important;
-                font-weight: 500 !important;
-                padding: 0.5rem 1rem !important;
-                font-size: 0.85rem !important;
-                transition: all 0.2s ease !important;
-                box-shadow: none !important;
-                color: #e2e8f0 !important;
+                background: linear-gradient(135deg, var(--cyan), var(--violet)) !important;
+                border: 1px solid var(--border-accent) !important;
+                border-radius: 12px !important;
+                font-weight: 600 !important;
+                padding: 0.7rem 1.4rem !important;
+                font-size: 0.9rem !important;
+                font-family: 'Inter', sans-serif;
+                transition: all 0.3s var(--ease) !important;
+                box-shadow: var(--shadow-soft) !important;
+                color: var(--text-primary) !important;
+                position: relative;
+                overflow: hidden;
             }
+            
+            .btn-primary::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                transition: left 0.5s var(--ease);
+            }
+            
             .btn-primary:hover {
-                background: #4a5568 !important;
-                color: #f7fafc !important;
+                box-shadow: var(--shadow-mid) !important;
+                opacity: 0.9;
             }
+            
+            .btn-primary:hover::before {
+                left: 100%;
+            }
+            
             .btn-primary:active {
-                background: #1a202c !important;
-                transform: scale(0.98) !important;
+                transform: translateY(0) scale(0.98) !important;
+                box-shadow: var(--shadow-soft) !important;
             }
+            
             .btn-secondary {
-                background: rgba(45, 55, 72, 0.1) !important;
-                border: 1px solid rgba(45, 55, 72, 0.2) !important;
-                color: #a0aec0 !important;
-                border-radius: 6px !important;
+                background: var(--glass-secondary) !important;
+                border: 1px solid var(--border-primary) !important;
+                color: var(--text-secondary) !important;
+                border-radius: 12px !important;
                 font-weight: 500 !important;
-                padding: 0.5rem 1rem !important;
-                font-size: 0.85rem !important;
-                transition: all 0.2s ease !important;
+                padding: 0.7rem 1.4rem !important;
+                font-size: 0.9rem !important;
+                font-family: 'Inter', sans-serif;
+                transition: all 0.3s var(--ease) !important;
+                backdrop-filter: blur(10px);
+                position: relative;
             }
+            
             .btn-secondary:hover {
-                background: rgba(45, 55, 72, 0.15) !important;
-                border-color: rgba(45, 55, 72, 0.3) !important;
-                color: #e2e8f0 !important;
+                background: var(--glass-primary) !important;
+                border-color: var(--border-accent) !important;
+                color: var(--text-primary) !important;
             }
+            
             .btn-secondary:active {
-                background: rgba(45, 55, 72, 0.25) !important;
-                transform: scale(0.98) !important;
+                transform: translateY(0) scale(0.98) !important;
+                box-shadow: var(--shadow-soft) !important;
             }
             
-            /* Professional Slider */
+            /* Premium Slider System */
             .rc-slider {
-                background: rgba(74, 85, 104, 0.3) !important;
-                border-radius: 3px !important;
-                height: 4px !important;
-            }
-            .rc-slider-track {
-                background: #4a5568 !important;
-                border-radius: 3px !important;
-                height: 4px !important;
-            }
-            .rc-slider-handle {
-                background: #e2e8f0 !important;
-                border: 2px solid #4a5568 !important;
-                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
-                width: 18px !important;
-                height: 18px !important;
-                margin-top: -7px !important;
-            }
-            .rc-slider-mark-text {
-                color: #a0aec0 !important;
-                font-size: 0.75rem !important;
+                background: var(--glass-tertiary) !important;
+                border-radius: 8px !important;
+                height: 6px !important;
+                position: relative;
             }
             
-            /* Game Selection Modal */
+            .rc-slider::before {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 0;
+                right: 0;
+                height: 1px;
+                background: linear-gradient(90deg, var(--cyan), var(--violet), var(--emerald));
+                transform: translateY(-50%);
+                opacity: 0.3;
+            }
+            
+            .rc-slider-track {
+                background: linear-gradient(90deg, var(--cyan), var(--violet)) !important;
+                border-radius: 8px !important;
+                height: 6px !important;
+            }
+            
+            .rc-slider-handle {
+                background: var(--text-primary) !important;
+                border: 3px solid var(--cyan) !important;
+                box-shadow: var(--shadow-mid) !important;
+                width: 24px !important;
+                height: 24px !important;
+                margin-top: -9px !important;
+                transition: all 0.3s var(--ease);
+                position: relative;
+            }
+            
+            .rc-slider-handle::before {
+                content: '';
+                position: absolute;
+                inset: 2px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, var(--cyan), var(--violet));
+                opacity: 0.8;
+            }
+            
+            .rc-slider-handle:hover {
+                transform: scale(1.05);
+                box-shadow: var(--shadow-deep);
+            }
+            
+            .rc-slider-mark-text {
+                color: var(--text-secondary) !important;
+                font-size: 0.75rem !important;
+                font-family: 'JetBrains Mono', monospace;
+                font-weight: 600;
+            }
+            
+            /* Premium Game Selection System */
+            .game-selector-btn {
+                background: var(--glass-secondary) !important;
+                border: 1px solid var(--border-primary) !important;
+                border-radius: 14px !important;
+                transition: all 0.3s var(--ease) !important;
+                backdrop-filter: blur(15px);
+                position: relative;
+            }
+            
+            .game-selector-btn::before {
+                content: '';
+                position: absolute;
+                inset: -1px;
+                border-radius: inherit;
+                background: linear-gradient(135deg, var(--cyan), var(--violet));
+                opacity: 0;
+                transition: opacity 0.3s var(--ease);
+                z-index: -1;
+            }
+            
             .game-selector-btn:hover {
-                background: rgba(26, 32, 44, 0.95) !important;
-                border-color: rgba(74, 85, 104, 0.6) !important;
-                transform: translateY(-1px);
+                background: var(--glass-primary) !important;
+                border-color: var(--border-accent) !important;
+            }
+            
+            .game-selector-btn:hover::before {
+                opacity: 0.1;
             }
             
             .game-card {
-                background: rgba(26, 32, 44, 0.6);
-                border: 1px solid rgba(74, 85, 104, 0.3);
-                border-radius: 8px;
-                padding: 1rem;
-                margin: 0.5rem 0;
+                background: var(--glass-secondary);
+                border: 1px solid var(--border-primary);
+                border-radius: 16px;
+                padding: 1.2rem;
+                margin: 0.6rem 0;
                 cursor: pointer;
-                transition: all 0.2s ease;
-                font-family: 'SF Mono', Consolas, monospace;
+                transition: all 0.3s var(--ease);
+                font-family: 'JetBrains Mono', monospace;
+                position: relative;
+                overflow: hidden;
+                backdrop-filter: blur(15px);
+            }
+            
+            .game-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+                opacity: 0;
+                transition: opacity 0.3s var(--ease);
             }
             
             .game-card:hover {
-                background: rgba(74, 85, 104, 0.2);
-                border-color: rgba(74, 85, 104, 0.5);
-                transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                background: var(--glass-primary);
+                border-color: var(--border-accent);
+                box-shadow: var(--shadow-mid);
+            }
+            
+            .game-card:hover::before {
+                opacity: 1;
             }
             
             .game-time {
-                color: #68d391;
-                font-weight: 600;
+                color: var(--emerald);
+                font-weight: 700;
                 font-size: 0.9rem;
-                margin-bottom: 0.5rem;
+                margin-bottom: 0.6rem;
+                font-family: 'JetBrains Mono', monospace;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                position: relative;
+            }
+            
+            .game-time::before {
+                content: '⏰';
+                margin-right: 0.5rem;
+                opacity: 0.7;
             }
             
             .game-matchup {
-                color: #e2e8f0;
-                font-weight: 500;
-                font-size: 1rem;
-                margin-bottom: 0.25rem;
+                color: var(--text-primary);
+                font-weight: 600;
+                font-size: 1.05rem;
+                margin-bottom: 0.4rem;
+                font-family: 'Inter', sans-serif;
+                line-height: 1.3;
             }
             
             .game-details {
-                color: #a0aec0;
-                font-size: 0.8rem;
+                color: var(--text-secondary);
+                font-size: 0.85rem;
+                font-family: 'JetBrains Mono', monospace;
+                font-weight: 500;
             }
             
             .live-indicator {
-                color: #f56565;
-                font-weight: 600;
+                color: var(--rose);
+                font-weight: 700;
                 font-size: 0.8rem;
+                font-family: 'JetBrains Mono', monospace;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                position: relative;
+                animation: pulse 2s infinite;
             }
             
-            /* Analysis Game Cards */
+            .live-indicator::before {
+                content: '●';
+                margin-right: 0.5rem;
+                animation: blink 1s infinite;
+            }
+            
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+            
+            @keyframes blink {
+                0%, 50% { opacity: 1; }
+                51%, 100% { opacity: 0.3; }
+            }
+            
+            /* Premium Analysis Cards */
+            .analysis-game-card {
+                background: var(--glass-secondary) !important;
+                border: 1px solid var(--border-primary) !important;
+                border-radius: 14px !important;
+                transition: all 0.3s var(--ease) !important;
+                backdrop-filter: blur(15px);
+                position: relative;
+            }
+            
+            .analysis-game-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 1px;
+                background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+                opacity: 0;
+                transition: opacity 0.3s var(--ease);
+            }
+            
             .analysis-game-card:hover {
-                background: rgba(74, 85, 104, 0.15) !important;
-                border-color: rgba(74, 85, 104, 0.4) !important;
-                transform: translateY(-1px);
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                background: var(--glass-primary) !important;
+                border-color: var(--border-accent) !important;
+                box-shadow: var(--shadow-mid) !important;
             }
             
-            /* Team Logos */
+            .analysis-game-card:hover::before {
+                opacity: 1;
+            }
+            
+            /* Premium Team Logos */
             .team-logo {
                 object-fit: contain;
-                filter: brightness(0.95);
-                transition: all 0.2s ease;
-                background: rgba(255, 255, 255, 0.05);
-                border-radius: 3px;
+                filter: brightness(0.9) saturate(1.1);
+                transition: all 0.3s var(--ease);
+                background: var(--glass-tertiary);
+                border-radius: 6px;
+                border: 1px solid var(--border-secondary);
+                position: relative;
             }
+            
+            .team-logo::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                pointer-events: none;
+            }
+            
             .team-logo:hover {
-                filter: brightness(1.1);
-                transform: scale(1.05);
+                filter: brightness(1.05) saturate(1.1);
+                border-color: var(--border-accent);
             }
-            /* Hide broken images */
+            
+            /* Hide broken images elegantly */
             .team-logo[src=""], .team-logo:not([src]) {
                 display: none;
             }
             
-            /* Hide number input spinners/scrollers */
-            input[type="number"]::-webkit-outer-spin-button,
-            input[type="number"]::-webkit-inner-spin-button {
-                -webkit-appearance: none !important;
-                margin: 0 !important;
+            .team-logo[src=""]:after, .team-logo:not([src]):after {
+                content: '🏀';
+                position: absolute;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.8rem;
+                opacity: 0.5;
             }
             
-            input[type="number"] {
-                -moz-appearance: textfield !important;
+            /* =====================================================
+               PREMIUM NAVIGATION & HEADER SYSTEM
+            ===================================================== */
+            
+            .nav-tabs {
+                border-bottom: 2px solid var(--border-primary);
+                margin-bottom: 2rem;
+                background: var(--glass-tertiary);
+                border-radius: 16px 16px 0 0;
+                padding: 0.5rem 0.5rem 0 0.5rem;
+                backdrop-filter: blur(15px);
             }
             
-            /* Prevent accidental scroll changes on number inputs */
-            input[type="number"]:focus {
-                -moz-appearance: textfield !important;
-            }
-            
-            /* Game Search Input */
-            #game_search_input.form-control {
-                /* Prevent event bubbling that might close modal */
-                z-index: 1050 !important;
-                position: relative !important;
-            }
-            
-            #game_search_input.form-control:focus {
-                border-color: #4fd1c7 !important;
-                box-shadow: 0 0 0 2px rgba(79, 209, 199, 0.2) !important;
-                z-index: 1051 !important;
-            }
-            
-            #game_search_input.form-control::placeholder {
-                color: #718096 !important;
-                font-style: italic;
-            }
-            
-            /* Prevent modal from closing when clicking in search area */
-            .modal-body {
+            .nav-tabs .nav-link {
+                background: transparent;
+                border: none;
+                color: var(--text-secondary);
+                font-family: 'Inter', sans-serif;
+                font-weight: 600;
+                padding: 1rem 2rem;
+                border-radius: 12px;
+                transition: all 0.3s var(--ease);
                 position: relative;
-                z-index: 1040;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                font-size: 0.85rem;
+                margin-right: 0.5rem;
             }
             
-            /* Refresh button styling */
-            #refresh_selected_game_btn:hover {
-                background: rgba(74, 85, 104, 0.4) !important;
-                color: #e2e8f0 !important;
-                border-color: rgba(74, 85, 104, 0.6) !important;
+            .nav-tabs .nav-link::before {
+                content: '';
+                position: absolute;
+                bottom: 0;
+                left: 50%;
+                width: 0;
+                height: 2px;
+                background: var(--cyan);
+                transition: all 0.3s var(--ease);
+                transform: translateX(-50%);
+            }
+            
+            .nav-tabs .nav-link:hover {
+                color: var(--text-primary);
+                background: var(--glass-secondary);
+            }
+            
+            .nav-tabs .nav-link.active {
+                color: var(--cyan);
+                background: var(--glass-primary);
+                border: 1px solid var(--border-accent);
+            }
+            
+            .nav-tabs .nav-link.active::before {
+                width: 60%;
+            }
+            
+            /* Premium Container */
+            .container-fluid {
+                position: relative;
+            }
+            
+            .container-fluid::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: 
+                    radial-gradient(circle at 20% 80%, rgba(0, 212, 255, 0.05) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+                pointer-events: none;
+                z-index: -1;
+            }
+            
+            /* Enhanced Typography */
+            h1, h2, h3, h4, h5, h6 {
+                font-family: 'Inter', sans-serif;
+                font-weight: 700;
+                background: linear-gradient(135deg, var(--text-primary), var(--cyan));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                letter-spacing: -0.02em;
+            }
+            
+            /* Number Enhancement */
+            .number-display {
+                font-family: 'JetBrains Mono', monospace;
+                font-variant-numeric: tabular-nums;
+                transition: all 0.3s var(--ease);
+            }
+            
+            .number-display:hover {
                 transform: scale(1.05);
+                text-shadow: 0 0 10px var(--cyan);
             }
             
-            #refresh_selected_game_btn:active {
-                background: rgba(74, 85, 104, 0.6) !important;
-                transform: scale(0.95);
+            /* Scrollbar Styling */
+            ::-webkit-scrollbar {
+                width: 8px;
             }
-        </style>
-        <script>
-            // Prevent modal from closing when interacting with search input
-            document.addEventListener('DOMContentLoaded', function() {
-                console.log('Setting up search input protection...');
-                
-                // Add event listeners to prevent modal close on search input interaction
-                document.addEventListener('click', function(e) {
-                    if (e.target && (e.target.id === 'game_search_input' || e.target.id === 'clear_search_btn')) {
-                        console.log('Preventing click propagation for search elements');
-                        e.stopPropagation();
-                    }
-                });
-                
-                document.addEventListener('keydown', function(e) {
-                    if (e.target && e.target.id === 'game_search_input') {
-                        console.log('Preventing keydown propagation for search input');
-                        e.stopPropagation();
-                    }
-                });
-                
-                document.addEventListener('input', function(e) {
-                    if (e.target && e.target.id === 'game_search_input') {
-                        console.log('Search input changed:', e.target.value);
-                        e.stopPropagation();
-                    }
-                });
-                
-                document.addEventListener('focus', function(e) {
-                    if (e.target && e.target.id === 'game_search_input') {
-                        console.log('Search input focused');
-                        e.stopPropagation();
-                    }
-                });
-                
-                // Prevent number inputs from changing values on trackpad/mousewheel scroll
-                document.addEventListener('wheel', function(e) {
-                    if (e.target && e.target.type === 'number' && document.activeElement === e.target) {
-                        console.log('Preventing number input scroll change');
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }
-                }, { passive: false });
-                
-                // Prevent accidental arrow key changes
-                document.addEventListener('keydown', function(e) {
-                    if (e.target && e.target.type === 'number') {
-                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                            // Only allow arrow keys if user is actively focused on the input
-                            if (document.activeElement !== e.target) {
-                                e.preventDefault();
-                            }
-                        }
-                    }
-                });
-            });
-        </script>
+            
+            ::-webkit-scrollbar-track {
+                background: var(--glass-tertiary);
+                border-radius: 4px;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: linear-gradient(180deg, var(--cyan), var(--violet));
+                border-radius: 4px;
+                border: 1px solid var(--border-primary);
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(180deg, var(--violet), var(--cyan));
+            }
+            
+            /* Refresh Button */
+            #refresh_game_button {
+                transition: all 0.2s var(--ease);
+                position: relative;
+                overflow: hidden;
+            }
+            
+            #refresh_game_button:hover {
+                background: rgba(16, 217, 196, 0.1) !important;
+                border-color: var(--cyan) !important;
+                color: var(--cyan) !important;
+                transform: rotate(180deg);
+                box-shadow: 0 0 15px rgba(16, 217, 196, 0.3);
+            }
+            
+            #refresh_game_button:active {
+                transform: rotate(180deg) scale(0.95);
+                background: rgba(16, 217, 196, 0.2) !important;
+            }
+            
+            #refresh_game_button:focus {
+                outline: none;
+                box-shadow: 0 0 0 2px rgba(16, 217, 196, 0.5);
+            }
+            
+            /* First Half Toggle Styling */
+            #first_half_toggle label {
+                color: var(--text-secondary) !important;
+                font-size: 0.75rem;
+                transition: all 0.2s var(--ease);
+                cursor: pointer;
+                user-select: none;
+            }
+            
+            #first_half_toggle input[type="checkbox"]:checked + label {
+                color: var(--cyan) !important;
+                text-shadow: 0 0 8px rgba(16, 217, 196, 0.3);
+            }
+            
+            #first_half_toggle .form-check-input {
+                background-color: rgba(26, 32, 44, 0.8);
+                border: 1px solid var(--border-primary);
+                width: 1rem;
+                height: 1rem;
+            }
+            
+            #first_half_toggle .form-check-input:checked {
+                background-color: var(--cyan);
+                border-color: var(--cyan);
+                box-shadow: 0 0 10px rgba(16, 217, 196, 0.3);
+            }
+            
+            /* =====================================================\n               NEW UI COMPONENTS v2.1\n            ===================================================== */\n            \n            /* Header Status Elements */\n            .version-badge {\n                background: linear-gradient(135deg, var(--cyan), var(--violet));\n                color: #ffffff;\n                padding: 0.2rem 0.6rem;\n                border-radius: 12px;\n                font-size: 0.75rem;\n                font-weight: 600;\n                text-transform: uppercase;\n                letter-spacing: 0.5px;\n            }\n            \n            /* Quick Stats Boxes */\n            .stat-box {\n                background: var(--glass-secondary);\n                border: 1px solid var(--border-color);\n                border-radius: 8px;\n                padding: 0.8rem;\n                text-align: center;\n                font-size: 0.8rem;\n                font-weight: 500;\n                color: var(--text-secondary);\n                min-width: 60px;\n                transition: all 0.2s ease;\n            }\n            \n            .stat-box:hover {\n                background: var(--hover-bg);\n                transform: translateY(-1px);\n            }\n            \n            .stat-box > div:first-child {\n                font-size: 1.2rem;\n                font-weight: 700;\n                color: var(--text-primary);\n                margin-bottom: 0.2rem;\n            }\n            \n            /* Enhanced Game Cards */\n            .game-card {\n                background: var(--glass-secondary);\n                border: 1px solid var(--border-color);\n                border-radius: 12px;\n                padding: 1rem;\n                margin-bottom: 0.75rem;\n                cursor: pointer;\n                transition: all 0.2s ease;\n                position: relative;\n                overflow: hidden;\n            }\n            \n            .game-card:hover {\n                background: var(--hover-bg);\n                border-color: var(--cyan);\n                transform: translateY(-2px);\n                box-shadow: var(--shadow-cyan);\n            }\n            \n            .game-card.selected {\n                background: var(--active-bg);\n                border-color: var(--cyan);\n                box-shadow: var(--shadow-cyan);\n            }\n            \n            .game-card.live {\n                border-left: 4px solid var(--live-color);\n            }\n            \n            .game-card.upcoming {\n                border-left: 4px solid var(--upcoming-color);\n            }\n            \n            .game-card.final {\n                border-left: 4px solid var(--final-color);\n                opacity: 0.7;\n            }\n            \n            /* Game Status Indicators */\n            .game-status {\n                position: absolute;\n                top: 0.5rem;\n                right: 0.5rem;\n                padding: 0.2rem 0.5rem;\n                border-radius: 20px;\n                font-size: 0.7rem;\n                font-weight: 600;\n                text-transform: uppercase;\n            }\n            \n            .game-status.live {\n                background: var(--live-color);\n                color: white;\n                animation: pulse 2s infinite;\n            }\n            \n            .game-status.upcoming {\n                background: var(--upcoming-color);\n                color: white;\n            }\n            \n            .game-status.final {\n                background: var(--final-color);\n                color: white;\n            }\n            \n            @keyframes pulse {\n                0%, 100% { opacity: 1; }\n                50% { opacity: 0.7; }\n            }\n            \n            /* Signal Dashboard */\n            .signal-display {\n                background: var(--glass-primary);\n                border: 2px solid transparent;\n                border-radius: 16px;\n                padding: 2rem;\n                text-align: center;\n                transition: all 0.3s ease;\n            }\n            \n            .signal-display.under {\n                border-color: var(--emerald);\n                background: rgba(16, 185, 129, 0.1);\n                box-shadow: var(--shadow-emerald);\n            }\n            \n            .signal-display.over {\n                border-color: var(--rose);\n                background: rgba(244, 63, 94, 0.1);\n                box-shadow: 0 2px 8px rgba(244, 63, 94, 0.15);\n            }\n            \n            .signal-display.hold {\n                border-color: var(--amber);\n                background: rgba(245, 158, 11, 0.1);\n                box-shadow: var(--shadow-amber);\n            }\n            \n            .signal-text {\n                font-size: 2rem;\n                font-weight: 700;\n                margin-bottom: 0.5rem;\n                text-transform: uppercase;\n                letter-spacing: 1px;\n            }\n            \n            .signal-subtitle {\n                font-size: 1rem;\n                color: var(--text-secondary);\n                margin-bottom: 1rem;\n            }\n            \n            /* Input Labels */\n            .input-label {\n                font-size: 0.85rem;\n                font-weight: 600;\n                color: var(--text-secondary);\n                margin-bottom: 0.5rem;\n                display: block;\n                text-transform: uppercase;\n                letter-spacing: 0.5px;\n            }\n            \n            /* Enhanced Filter Buttons */\n            .btn-outline-success:hover,\n            .btn-outline-primary:hover,\n            .btn-outline-secondary:hover,\n            .btn-outline-info:hover {\n                transform: translateY(-1px);\n                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);\n            }\n            \n            /* Loading States */\n            .loading {\n                opacity: 0.6;\n                pointer-events: none;\n            }\n            \n            .loading::after {\n                content: \"\";\n                position: absolute;\n                top: 50%;\n                left: 50%;\n                width: 20px;\n                height: 20px;\n                margin: -10px 0 0 -10px;\n                border: 2px solid var(--text-tertiary);\n                border-top-color: var(--cyan);\n                border-radius: 50%;\n                animation: spin 1s linear infinite;\n            }\n            \n            @keyframes spin {\n                to { transform: rotate(360deg); }\n            }\n            \n            /* Responsive Design */\n            @media (max-width: 768px) {\n                .stat-box {\n                    min-width: 50px;\n                    padding: 0.5rem;\n                    font-size: 0.7rem;\n                }\n                \n                .game-card {\n                    padding: 0.75rem;\n                }\n                \n                .signal-display {\n                    padding: 1.5rem;\n                }\n                \n                .signal-text {\n                    font-size: 1.5rem;\n                }\n            }\n            \n            /* Hide number input spinners (from v1) */\n            input[type=\"number\"]::-webkit-outer-spin-button,\n            input[type=\"number\"]::-webkit-inner-spin-button {\n                -webkit-appearance: none;\n                margin: 0;\n            }\n            \n            input[type=\"number\"] {\n                -moz-appearance: textfield;\n            }\n            \n        </style>\n        <script>\n            // Enhanced interaction handling for v2.1\n            document.addEventListener('DOMContentLoaded', function() {\n                // Prevent wheel events on number inputs when focused\n                document.addEventListener('wheel', function(e) {\n                    if (document.activeElement.type === 'number') {\n                        e.preventDefault();\n                    }\n                }, { passive: false });\n                \n                // Prevent arrow key changes when input is not actively focused\n                document.addEventListener('keydown', function(e) {\n                    if (e.target.type === 'number' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {\n                        if (document.activeElement !== e.target) {\n                            e.preventDefault();\n                        }\n                    }\n                });\n                \n                // Keyboard shortcuts\n                document.addEventListener('keydown', function(e) {\n                    // Ctrl/Cmd + 1-4 for quick filters\n                    if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '4') {\n                        e.preventDefault();\n                        const buttons = ['filter-live', 'filter-today', 'filter-tomorrow', 'filter-week'];\n                        const button = document.getElementById(buttons[parseInt(e.key) - 1]);\n                        if (button) button.click();\n                    }\n                    \n                    // Space bar to refresh when no input is focused\n                    if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {\n                        e.preventDefault();\n                        // Trigger manual refresh\n                        window.dispatchEvent(new Event('manual-refresh'));\n                    }\n                });\n                \n                // Auto-scroll to selected game\n                function scrollToSelected() {\n                    const selected = document.querySelector('.game-card.selected');\n                    if (selected) {\n                        selected.scrollIntoView({ behavior: 'smooth', block: 'center' });\n                    }\n                }\n                \n                // Observe for selected game changes\n                const observer = new MutationObserver(function(mutations) {\n                    mutations.forEach(function(mutation) {\n                        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {\n                            if (mutation.target.classList.contains('selected')) {\n                                setTimeout(scrollToSelected, 100);\n                            }\n                        }\n                    });\n                });\n                \n                // Start observing for dynamic content\n                const gameContainer = document.getElementById('live-games-feed');\n                if (gameContainer) {\n                    const cardObserver = new MutationObserver(function(mutations) {\n                        mutations.forEach(function(mutation) {\n                            mutation.addedNodes.forEach(function(node) {\n                                if (node.nodeType === 1 && node.classList.contains('game-card')) {\n                                    observer.observe(node, { attributes: true });\n                                }\n                            });\n                        });\n                    });\n                    cardObserver.observe(gameContainer, { childList: true, subtree: true });\n                }\n            });\n        </script>"}"}
     </head>
     <body>
         {%app_entry%}
@@ -519,12 +1048,12 @@ def fetch_games_by_date(date_str=None):
     """Fetch college basketball games from ESPN's internal API for a specific date"""
     try:
         if date_str:
-            # Add parameters to get more comprehensive data
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}&limit=300"
+            # limit=300 and groups=50 ensure we get ALL games, not just top 25
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}&limit=300&groups=50"
         else:
             # For "today", use current date regardless of time - college games often span midnight
             today_str = datetime.now().strftime('%Y%m%d')
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={today_str}&limit=300"
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={today_str}&limit=300&groups=50"
         
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -586,12 +1115,9 @@ def fetch_games_by_date(date_str=None):
                         minutes_left = int(mins)
                         seconds_left = int(secs.split('.')[0])  # Remove decimals
                         
-                        # Automatically convert first half time to full game time remaining
-                        if period == 1:  # First half
-                            original_mins = minutes_left
-                            minutes_left += 20  # Add 20 for entire second half
-                            print(f"DEBUG: First half auto-conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
-                        # If period == 2 (second half) or overtime, leave as is
+                        # Auto-convert to full game time: add 20 min if first half
+                        if period == 1:
+                            minutes_left += 20
                         
                         game_info['minutes_left'] = minutes_left
                         game_info['seconds_left'] = seconds_left
@@ -692,20 +1218,11 @@ def get_basketball_odds(sport_key='basketball_ncaab'):
     }
     
     try:
-        print(f"🔍 Requesting odds from: {url}")
         response = requests.get(url, params=params)
         response.raise_for_status()
         
         games = response.json()
         print(f"📊 Odds API: Found {len(games)} games with betting lines")
-        
-        # Debug: Show first game if available
-        if games:
-            first_game = games[0]
-            print(f"🔍 Sample game: {first_game.get('away_team', 'Unknown')} @ {first_game.get('home_team', 'Unknown')}")
-        else:
-            print(f"⚠️ Odds API returned empty games list")
-        
         return games
         
     except requests.exceptions.RequestException as e:
@@ -752,6 +1269,34 @@ def extract_betting_totals(odds_games):
     
     return betting_data
 
+def match_espn_with_odds(espn_games, betting_data):
+    """Match ESPN games with betting lines"""
+    matched_games = []
+    
+    for espn_game in espn_games:
+        home_team = espn_game.get('home_team', '')
+        away_team = espn_game.get('away_team', '')
+        
+        # Try to match with betting data
+        match_key = f"{away_team}|{home_team}"
+        betting_info = betting_data.get(match_key)
+        
+        # Add betting data if found
+        enhanced_game = espn_game.copy()
+        if betting_info:
+            enhanced_game.update({
+                'betting_total': betting_info['avg_total'],
+                'betting_range': betting_info['total_range'],
+                'num_sportsbooks': betting_info['num_books'],
+                'has_betting_line': True
+            })
+        else:
+            enhanced_game['has_betting_line'] = False
+        
+        matched_games.append(enhanced_game)
+    
+    return matched_games
+
 def format_game_option(game):
     """Format game data for dropdown display - clean and professional"""
     def shorten_team_name(name, max_len=12):
@@ -786,9 +1331,12 @@ def format_game_option(game):
     home = shorten_team_name(game['home_team'])
     
     if game['is_live']:
+        # Show raw ESPN time - user controls conversion with toggle
+        display_clock = game['clock']
+        
         score = f"{game['away_score']}-{game['home_score']}"
         return {
-            'label': f"{away} {score} {home} • {game['clock']}",
+            'label': f"{away} {score} {home} • {display_clock}",
             'value': game['id']
         }
     else:
@@ -832,40 +1380,59 @@ def get_fade_analysis(team1, team2, live_total, min_left, my_bet=None, period_ti
 def score_input(label, input_id):
     return html.Div([
         html.Div(label, className="label"),
-        dbc.InputGroup([
-            dbc.Button("−", id={"type": "dec", "index": input_id}, className="btn-adj px-3"),
-            dbc.Input(id=input_id, type="number", placeholder="0", style={"textAlign": "center"}),
-            dbc.Button("+", id={"type": "inc", "index": input_id}, className="btn-adj px-3"),
-        ], size="sm")
-    ], className="mb-3")
-
-def small_input_with_buttons(label, input_id, placeholder="-", min_val=None, max_val=None):
-    input_props = {
-        "id": input_id, 
-        "type": "number", 
-        "placeholder": placeholder, 
-        "style": {"textAlign": "center"}
-    }
-    if min_val is not None:
-        input_props["min"] = min_val
-    if max_val is not None:
-        input_props["max"] = max_val
-    
-    return html.Div([
-        html.Div(label, className="label"),
-        dbc.InputGroup([
-            dbc.Button("−", id={"type": "dec_small", "index": input_id}, className="btn-adj-small px-1"),
-            dbc.Input(**input_props),
-            dbc.Button("+", id={"type": "inc_small", "index": input_id}, className="btn-adj-small px-1"),
-        ], size="sm")
+        html.Div([
+            # Main input field (normal like others)
+            dbc.Input(
+                id=input_id, 
+                type="number", 
+                style={"textAlign": "center", "marginBottom": "0.5rem"}
+            ),
+            # Small +/- buttons below the input
+            html.Div([
+                dbc.Button("−", id={"type": "dec", "index": input_id}, 
+                          className="btn-micro", size="sm"),
+                dbc.Button("+", id={"type": "inc", "index": input_id}, 
+                          className="btn-micro", size="sm"),
+            ], style={
+                "display": "flex", 
+                "gap": "0.25rem", 
+                "justifyContent": "center"
+            })
+        ])
     ], className="mb-3")
 
 
 app.layout = dbc.Container([
+    # Game Reminder Box (top left)
+    html.Div([
+        dbc.Input(
+            id="game_reminder_input",
+            type="text",
+            placeholder="Game...",
+            style={
+                "width": "200px",
+                "fontSize": "0.75rem",
+                "padding": "0.4rem 0.6rem"
+            }
+        )
+    ], style={
+        "position": "absolute",
+        "top": "10px",
+        "left": "10px",
+        "zIndex": "1000"
+    }),
+    
     # Professional Header
     html.Div([
-        html.H2("- CBB Fade Terminal -", 
-                style={"fontWeight": "600", "color": "#f7fafc", "marginBottom": "0.5rem", "letterSpacing": "-0.02em"}),
+        html.H2("CBB Fade Terminal v2.0", 
+                style={
+                    "fontWeight": "700", 
+                    "marginBottom": "0.5rem", 
+                    "letterSpacing": "-0.02em",
+                    "fontSize": "2.2rem",
+                    "textAlign": "center",
+                    "position": "relative"
+                }),
     ], className="text-center", style={"padding": "2rem 0 1.5rem 0"}),
     
     # Professional Tabs
@@ -888,7 +1455,8 @@ app.layout = dbc.Container([
     dcc.Store(id="tomorrow_games_data", data=[]),
     dcc.Store(id="week_games_data", data=[]),
     dcc.Store(id="betting_odds_data", data={}),
-    dcc.Interval(id="refresh_games", interval=30*1000, n_intervals=0),  # Refresh every 30 seconds (less frequent to avoid search interference)
+    dcc.Store(id="game_reminder_store", data="", storage_type='local'),
+    dcc.Interval(id="refresh_games", interval=30*1000, n_intervals=0),  # Refresh every 30 seconds
     
     # Game Selection Modal
     dbc.Modal([
@@ -898,45 +1466,23 @@ app.layout = dbc.Container([
         dbc.ModalBody([
             # Search bar
             html.Div([
-                dbc.InputGroup([
-                    dbc.Input(
-                        id="game_search_input",
-                        placeholder="Search teams (e.g., 'Duke', 'Carolina', 'Lakers')...",
-                        type="text",
-                        autoComplete="off",
-                        style={
-                            "background": "rgba(45, 55, 72, 0.9)",
-                            "border": "1px solid rgba(74, 85, 104, 0.5)",
-                            "borderRadius": "8px 0 0 8px",
-                            "color": "#f7fafc",
-                            "fontSize": "0.9rem",
-                            "padding": "0.75rem"
-                        }
-                    ),
-                    dbc.Button(
-                        "✕",
-                        id="clear_search_btn",
-                        color="secondary",
-                        size="sm",
-                        style={
-                            "background": "rgba(74, 85, 104, 0.3)",
-                            "border": "1px solid rgba(74, 85, 104, 0.5)",
-                            "borderRadius": "0 8px 8px 0",
-                            "color": "#a0aec0",
-                            "fontSize": "0.8rem",
-                            "padding": "0.5rem",
-                            "minWidth": "40px"
-                        }
-                    )
-                ], className="mb-3")
+                dbc.Input(
+                    id="game_search_input",
+                    placeholder="Search teams (e.g., 'Duke', 'Michigan')", 
+                    style={
+                        "marginBottom": "1rem",
+                        "background": "rgba(26, 32, 44, 0.9)",
+                        "border": "1px solid rgba(74, 85, 104, 0.4)",
+                        "color": "#e5e5e5"
+                    }
+                )
             ]),
-            # Games grid
             html.Div(id="game_selection_grid", style={"maxHeight": "50vh", "overflowY": "auto"})
         ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none", "padding": "1.5rem"}),
         dbc.ModalFooter([
             dbc.Button("Cancel", id="game_modal_close", className="pro-button-secondary", size="sm")
         ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"})
-    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static", keyboard=False)
+    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static")
 ], fluid=True, style={"maxWidth": "1400px", "padding": "0 2rem"})
 
 
@@ -965,15 +1511,16 @@ def create_fade_tab():
                             html.Span("Live Game", className="label"),
                             html.Span(" (ESPN)", style={"fontSize": "0.65rem", "color": "#555", "marginLeft": "6px"})
                         ]),
-                        html.Button(
-                            id="game_selector_button",
-                            children=[
-                                html.Div("Select Game", id="game_selector_text", style={"color": "#a0aec0"}),
-                                html.Div("⌄", style={"fontSize": "1.2rem", "marginLeft": "auto"})
-                            ],
-                            className="game-selector-btn",
-                            style={
-                                "width": "100%", 
+                        html.Div([
+                            html.Button(
+                                id="game_selector_button",
+                                children=[
+                                    html.Div("Select Game", id="game_selector_text", style={"color": "#a0aec0"}),
+                                    html.Div("⌄", style={"fontSize": "1.2rem", "marginLeft": "auto"})
+                                ],
+                                className="game-selector-btn",
+                                style={
+                                    "width": "100%", 
                                 "display": "flex", 
                                 "alignItems": "center",
                                 "justifyContent": "space-between",
@@ -985,25 +1532,27 @@ def create_fade_tab():
                                 "transition": "all 0.2s ease"
                             }
                         ),
-                        # Small refresh button for selected game
-                        html.Div([
-                            dbc.Button(
-                                "🔄",
-                                id="refresh_selected_game_btn",
-                                color="secondary",
-                                size="sm",
-                                style={
-                                    "background": "rgba(74, 85, 104, 0.2)",
-                                    "border": "1px solid rgba(74, 85, 104, 0.4)",
-                                    "color": "#a0aec0",
-                                    "fontSize": "0.8rem",
-                                    "padding": "0.4rem 0.6rem",
-                                    "marginTop": "0.5rem",
-                                    "borderRadius": "6px"
-                                },
-                                title="Refresh live scores for selected game"
-                            )
-                        ], style={"textAlign": "right"}),
+                        html.Button(
+                            "↻",
+                            id="refresh_game_button",
+                            className="btn btn-outline-secondary",
+                            style={
+                                "width": "40px",
+                                "height": "40px", 
+                                "marginLeft": "8px",
+                                "background": "rgba(26, 32, 44, 0.9)",
+                                "border": "1px solid rgba(74, 85, 104, 0.4)",
+                                "color": "#a0aec0",
+                                "borderRadius": "8px",
+                                "fontSize": "1.2rem",
+                                "display": "flex",
+                                "alignItems": "center",
+                                "justifyContent": "center",
+                                "transition": "all 0.2s ease"
+                            },
+                            title="Refresh live scores and time"
+                        ),
+                        ], style={"display": "flex", "alignItems": "start"}),
                         # Store selected game ID and button text separately for persistence
                         dcc.Store(id="live_game_selector", data=None),
                         dcc.Store(id="selected_game_text", data="Select Game"),
@@ -1014,20 +1563,36 @@ def create_fade_tab():
                         dbc.Col(score_input("Away", "team2"), width=6),
                     ]),
                     
-                    small_input_with_buttons("Live Total", "live_total"),
+                    html.Div([
+                        html.Div("Live Total", className="label"),
+                        dbc.Input(id="live_total", type="number"),
+                    ], className="mb-3"),
                     
                     dbc.Row([
                         dbc.Col([
-                            small_input_with_buttons("Minutes", "mins_left", min_val=0)
+                            html.Div("Minutes", className="label"),
+                            dbc.Input(id="mins_left", type="number", min=0)
                         ], width=6),
                         dbc.Col([
-                            small_input_with_buttons("Seconds", "secs_left", min_val=0, max_val=59)
+                            html.Div("Seconds", className="label"),
+                            dbc.Input(id="secs_left", type="number", min=0, max=59)
                         ], width=6),
-                    ], className="mb-4"),
+                    ], className="mb-2"),
+                    
+                    # First Half Toggle
+                    html.Div([
+                        dbc.Checklist(
+                            id="first_half_toggle",
+                            options=[{"label": "First Half (+20 min)", "value": "first_half"}],
+                            value=[],
+                            inline=True,
+                            style={"fontSize": "0.8rem", "color": "#a0aec0"}
+                        )
+                    ], className="mb-4", style={"textAlign": "center"}),
                     
                     html.Div([
                         html.Div("Your Under (optional)", className="label"),
-                        dbc.Input(id="my_bet", type="number", placeholder="-"),
+                        dbc.Input(id="my_bet", type="number"),
                     ], className="mb-4"),
                     
                     html.Div([
@@ -1051,7 +1616,6 @@ def create_fade_tab():
                                 id="live_analysis_games_input",
                                 type="text",
                                 value="5",
-                                placeholder="5",
                                 style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.85rem"}
                             ),
                             dbc.InputGroupText("games", style={
@@ -1095,7 +1659,6 @@ def create_analysis_tab():
                             dcc.Dropdown(
                                 id="team1_selector",
                                 options=[],
-                                placeholder="Select Team 1...",
                                 clearable=True,
                                 searchable=True,
                                 className="dark-dropdown"
@@ -1105,7 +1668,6 @@ def create_analysis_tab():
                             dcc.Dropdown(
                                 id="team2_selector", 
                                 options=[],
-                                placeholder="Select Team 2...",
                                 clearable=True,
                                 searchable=True,
                                 className="dark-dropdown"
@@ -1123,7 +1685,6 @@ def create_analysis_tab():
                                     id="games_count_input",
                                     type="text",
                                     value="5",
-                                    placeholder="5",
                                     style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.9rem"}
                                 ),
                                 dbc.InputGroupText("games", style={
@@ -1183,37 +1744,17 @@ def update_periods(gl):
 def adj_scores(inc, dec, t1, t2):
     if not ctx.triggered_id: raise dash.exceptions.PreventUpdate
     t = ctx.triggered_id
-    t1, t2 = t1 or 0, t2 or 0
+    # Don't force "0" to appear - keep inputs clean
+    t1 = t1 if t1 is not None else None
+    t2 = t2 if t2 is not None else None
     d = 1 if t["type"] == "inc" else -1
-    if t["index"] == "team1": t1 = max(0, t1 + d)
-    elif t["index"] == "team2": t2 = max(0, t2 + d)
+    if t["index"] == "team1": 
+        t1 = max(0, (t1 or 0) + d)
+        t1 = None if t1 == 0 else t1  # Don't show 0
+    elif t["index"] == "team2": 
+        t2 = max(0, (t2 or 0) + d)  
+        t2 = None if t2 == 0 else t2  # Don't show 0
     return t1, t2
-
-@app.callback(
-    Output("live_total", "value"), Output("mins_left", "value"), Output("secs_left", "value"),
-    Input({"type": "inc_small", "index": ALL}, "n_clicks"),
-    Input({"type": "dec_small", "index": ALL}, "n_clicks"),
-    State("live_total", "value"), State("mins_left", "value"), State("secs_left", "value"),
-    prevent_initial_call=True
-)
-def adj_small_inputs(inc, dec, live_total, mins, secs):
-    if not ctx.triggered_id: raise dash.exceptions.PreventUpdate
-    t = ctx.triggered_id
-    
-    live_total = live_total or 0
-    mins = mins or 0
-    secs = secs or 0
-    
-    d = 1 if t["type"] == "inc_small" else -1
-    
-    if t["index"] == "live_total":
-        live_total = max(0, live_total + d)
-    elif t["index"] == "mins_left":
-        mins = max(0, mins + d)
-    elif t["index"] == "secs_left":
-        secs = max(0, min(59, secs + d))  # Keep seconds between 0-59
-    
-    return live_total, mins, secs
 
 
 # ESPN API Callbacks
@@ -1227,31 +1768,26 @@ def adj_small_inputs(inc, dec, live_total, mins, secs):
 )
 def refresh_all_games(n):
     """Fetch all games data every interval"""
-    # Expand date ranges for more comprehensive coverage
+    # Combine live and pre-game for more comprehensive list
+    live_games = fetch_live_games()
+    
+    # Get extended date ranges for more games
     today = datetime.now().strftime('%Y%m%d')
     tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y%m%d')
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
     
-    # Get today's games (including yesterday's late games that might still be live)
+    # Include yesterday's late games that might still be live  
     yesterday_games = fetch_games_by_date(yesterday)
     today_games = fetch_games_by_date(today)
     tomorrow_games = fetch_games_by_date(tomorrow)
     
-    # Combine all current/live games from multiple days for more options
-    all_current_games = yesterday_games + today_games + tomorrow_games
+    # Combine all current/live games from multiple days
+    all_live_candidates = yesterday_games + today_games + tomorrow_games
+    live_games_expanded = [g for g in all_live_candidates if g['state'] in ['in', 'pre']]
     
-    # Also get games from the next few days to include busy game days
-    for days_ahead in range(2, 7):  # Days 2-6 ahead (Tuesday through Saturday)
-        future_date = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
-        future_games = fetch_games_by_date(future_date)
-        all_current_games.extend(future_games)
-    
-    # Show live games + upcoming games from all fetched days (not just today)
-    live_games = [g for g in all_current_games if g['state'] in ['in', 'pre']]
-    
-    # Get extended week's games (next 14 days for more options)
+    # Get week's games (next 10 days for more options)
     week_games = []
-    for days_ahead in range(-1, 14):  # Include yesterday through next 13 days
+    for days_ahead in range(-1, 10):  # Include yesterday through next 9 days
         date_str = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
         games = fetch_games_by_date(date_str)
         week_games.extend(games)
@@ -1268,18 +1804,14 @@ def refresh_all_games(n):
     try:
         odds_games = get_basketball_odds()
         betting_data = extract_betting_totals(odds_games)
-        print(f"📊 Game Summary:")
-        print(f"   Yesterday: {len(yesterday_games)} games")
-        print(f"   Today: {len(today_games)} games") 
-        print(f"   Tomorrow: {len(tomorrow_games)} games")
-        print(f"   Live/Upcoming: {len(live_games)} games (across all days)")
-        print(f"   Total Week: {len(unique_week_games)} games")
-        print(f"   Betting Lines: {len(betting_data)} matched")
+        print(f"📊 Fetched {len(live_games_expanded)} live/upcoming games from ESPN")
+        print(f"📊 Fetched {len(unique_week_games)} total games this week")
+        print(f"📊 Matched {len(betting_data)} games with betting lines")
     except Exception as e:
         print(f"❌ Error fetching odds: {e}")
         betting_data = {}
     
-    return live_games, today_games, tomorrow_games, unique_week_games, betting_data
+    return live_games_expanded, today_games, tomorrow_games, unique_week_games, betting_data
 
 # Modal Callbacks
 @app.callback(
@@ -1297,76 +1829,64 @@ def toggle_game_modal(open_clicks, close_clicks, game_clicks, is_open, active_ta
         # Only process if we're on the fade tab (where the button exists)
         if active_tab != "fade-tab":
             return False
-        
-        # Get the component that triggered this callback
-        triggered_id = ctx.triggered_id
-        print(f"DEBUG: Modal callback triggered by: {triggered_id}")
             
         # Only open when button is explicitly clicked
-        if triggered_id == "game_selector_button" and open_clicks:
-            print("DEBUG: Opening modal")
+        if ctx.triggered_id == "game_selector_button" and open_clicks:
             return True
-        # Close when cancel clicked
-        elif triggered_id == "game_modal_close" and close_clicks:
-            print("DEBUG: Closing modal - cancel button")
+        # Close when cancel clicked or any game card clicked
+        elif ctx.triggered_id == "game_modal_close" or (game_clicks and any(game_clicks)):
             return False
-        # Close when game card clicked
-        elif triggered_id and "game-card" in str(triggered_id) and game_clicks and any(game_clicks):
-            print("DEBUG: Closing modal - game selected")
-            return False
-        # Stay in current state for any other triggers
-        else:
-            print(f"DEBUG: Keeping modal state: {is_open}")
-            return is_open
-    except Exception as e:
-        print(f"DEBUG: Modal callback error: {e}")
-        # Graceful fallback - maintain current state
-        return is_open if is_open is not None else False
+        # Default to closed state
+        return False
+    except Exception:
+        # Graceful fallback for any callback issues
+        return False
 
 @app.callback(
-    Output("game_search_input", "value", allow_duplicate=True),
-    Input("clear_search_btn", "n_clicks"),
+    Output("game_search_input", "value"),
+    Input("game_selection_modal", "is_open"),
     prevent_initial_call=True
 )
-def clear_search_input(n_clicks):
-    """Clear search input when X button is clicked"""
-    if n_clicks:
-        return ""
-    raise dash.exceptions.PreventUpdate
+def clear_search_on_modal_open(is_open):
+    """Clear search input when modal opens"""
+    if is_open:
+        return ""  # Clear the search when modal opens
+    return dash.no_update
 
 @app.callback(
     Output("game_selection_grid", "children"),
-    Input("live_games_data", "data"),
-    Input("game_search_input", "value")
+    [Input("live_games_data", "data"),
+     Input("game_search_input", "value")]
 )
 def populate_game_modal(games_data, search_term):
-    """Populate modal with game cards (with search filtering)"""
-    print(f"DEBUG: populate_game_modal called with search_term: '{search_term}', games: {len(games_data) if games_data else 0}")
-    
+    """Populate modal with game cards, filtered by search term"""
     if not games_data:
         return html.Div("No games available", style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
     
     # Filter games based on search term
     filtered_games = games_data
-    if search_term and len(search_term.strip()) > 0:
-        search_lower = search_term.lower().strip()
+    if search_term and search_term.strip():
+        search_lower = search_term.strip().lower()
         filtered_games = []
         for game in games_data:
-            # Search in team names
-            if (search_lower in game.get('home_team', '').lower() or 
-                search_lower in game.get('away_team', '').lower()):
+            home_team = game.get('home_team', '').lower()
+            away_team = game.get('away_team', '').lower()
+            if search_lower in home_team or search_lower in away_team:
                 filtered_games.append(game)
     
     if not filtered_games:
-        search_msg = f"No games found for '{search_term}'" if search_term else "No games available"
-        return html.Div(search_msg, style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
+        return html.Div(f"No games found matching '{search_term}'", 
+                       style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
     
     game_cards = []
     for i, game in enumerate(filtered_games):
         if game['is_live']:
+            # Show raw ESPN time - user controls conversion with toggle
+            display_clock = game['clock']
+            
             time_display = html.Div([
                 html.Span("LIVE", className="live-indicator"),
-                html.Span(f" • {game['clock']}", style={"color": "#a0aec0", "fontSize": "0.8rem"})
+                html.Span(f" • {display_clock}", style={"color": "#a0aec0", "fontSize": "0.8rem"})
             ], className="game-time")
             details = f"{game['away_score']}-{game['home_score']} • Total: {game['away_score'] + game['home_score']}"
         else:
@@ -1413,12 +1933,11 @@ def populate_game_modal(games_data, search_term):
     [Output("live_game_selector", "data"),
      Output("selected_game_text", "data")],
     [Input({"type": "game-card", "index": ALL}, "n_clicks")],
-    [State("live_games_data", "data"),
-     State("game_search_input", "value")],
+    [State("live_games_data", "data")],
     prevent_initial_call=True
 )
-def select_game_from_modal(game_clicks, games_data, search_term):
-    """Handle game selection from modal (with search filtering)"""
+def select_game_from_modal(game_clicks, games_data):
+    """Handle game selection from modal"""
     print(f"DEBUG: select_game_from_modal called with clicks: {game_clicks}, games_data length: {len(games_data) if games_data else 0}")
     
     # Don't reset if no clicks - this was causing the reset!
@@ -1430,16 +1949,6 @@ def select_game_from_modal(game_clicks, games_data, search_term):
         print("DEBUG: No games data - preventing update")
         raise dash.exceptions.PreventUpdate
     
-    # Apply same filtering logic as populate_game_modal
-    filtered_games = games_data
-    if search_term and len(search_term.strip()) > 0:
-        search_lower = search_term.lower().strip()
-        filtered_games = []
-        for game in games_data:
-            if (search_lower in game.get('home_team', '').lower() or 
-                search_lower in game.get('away_team', '').lower()):
-                filtered_games.append(game)
-    
     # Find which game was clicked (look for the highest click count)
     clicked_index = None
     max_clicks = 0
@@ -1448,8 +1957,8 @@ def select_game_from_modal(game_clicks, games_data, search_term):
             max_clicks = clicks
             clicked_index = i
     
-    if clicked_index is not None and clicked_index < len(filtered_games):
-        selected_game = filtered_games[clicked_index]
+    if clicked_index is not None and clicked_index < len(games_data):
+        selected_game = games_data[clicked_index]
         
         # Create display text with live score if available
         if selected_game.get('is_live'):
@@ -1475,94 +1984,6 @@ def select_game_from_modal(game_clicks, games_data, search_term):
 def update_button_text(game_text):
     """Update button text from persistent storage"""
     return game_text or "Select Game"
-
-@app.callback(
-    Output("selected_game_data", "data", allow_duplicate=True),
-    Input("refresh_selected_game_btn", "n_clicks"),
-    State("persistent_game_selection", "data"),
-    prevent_initial_call=True
-)
-def refresh_selected_game_data(n_clicks, selected_game_id):
-    """Refresh the stored game data by fetching fresh data directly from ESPN"""
-    if not n_clicks or not selected_game_id:
-        raise dash.exceptions.PreventUpdate
-    
-    print(f"DEBUG: Refresh button clicked for game ID: {selected_game_id}")
-    
-    # Fetch fresh live games data directly from ESPN
-    try:
-        fresh_live_games = fetch_live_games()
-        print(f"DEBUG: Fetched {len(fresh_live_games)} fresh games from ESPN")
-        
-        # Find the selected game in fresh data
-        updated_game = None
-        for game in fresh_live_games:
-            if str(game.get('id')) == str(selected_game_id):
-                updated_game = game
-                break
-        
-        if not updated_game:
-            print(f"DEBUG: Could not find selected game {selected_game_id} in fresh ESPN data")
-            # Try fetching from multiple days
-            from datetime import datetime, timedelta
-            for days_offset in [-1, 0, 1]:  # Yesterday, today, tomorrow
-                date_str = (datetime.now() + timedelta(days=days_offset)).strftime('%Y%m%d')
-                day_games = fetch_games_by_date(date_str)
-                for game in day_games:
-                    if str(game.get('id')) == str(selected_game_id):
-                        updated_game = game
-                        print(f"DEBUG: Found game in {date_str} data")
-                        break
-                if updated_game:
-                    break
-        
-        if not updated_game:
-            print(f"DEBUG: Still could not find game {selected_game_id} anywhere")
-            raise dash.exceptions.PreventUpdate
-        
-        print(f"DEBUG: ✅ REFRESHING game data for {updated_game.get('away_team', '')} @ {updated_game.get('home_team', '')}")
-        print(f"DEBUG: ✅ Fresh scores - {updated_game.get('away_score', 0)}-{updated_game.get('home_score', 0)}")
-        print(f"DEBUG: ✅ Fresh time - {updated_game.get('clock', 'N/A')} (Period {updated_game.get('period', 'N/A')})")
-        print(f"DEBUG: ✅ Game state - {updated_game.get('state', 'N/A')}")
-        
-        # Return the fresh game data to update the store
-        return updated_game
-        
-    except Exception as e:
-        print(f"DEBUG: Error fetching fresh game data: {e}")
-        raise dash.exceptions.PreventUpdate
-
-@app.callback(
-    Output("refresh_selected_game_btn", "style"),
-    Input("persistent_game_selection", "data")
-)
-def toggle_refresh_button_visibility(selected_game_id):
-    """Show refresh button only when a game is selected"""
-    base_style = {
-        "background": "rgba(74, 85, 104, 0.2)",
-        "border": "1px solid rgba(74, 85, 104, 0.4)",
-        "color": "#a0aec0",
-        "fontSize": "0.8rem",
-        "padding": "0.4rem 0.6rem",
-        "marginTop": "0.5rem",
-        "borderRadius": "6px"
-    }
-    
-    if selected_game_id:
-        # Game selected - show button with hover effect
-        base_style.update({
-            "display": "inline-block",
-            "opacity": "1",
-            "cursor": "pointer"
-        })
-    else:
-        # No game selected - hide button
-        base_style.update({
-            "display": "none",
-            "opacity": "0"
-        })
-    
-    return base_style
 
 # Removed legacy dropdown callback - now using modal selection only
 
@@ -1603,55 +2024,47 @@ def store_selected_game(game_id, games_data):
 def auto_fill_from_game(game_data, betting_odds_data):
     """Auto-fill scores, time, and live total from selected game"""
     if not game_data:
-        print("DEBUG: ❌ auto_fill_from_game - No game data")
         raise dash.exceptions.PreventUpdate
-    
-    print(f"DEBUG: 🔄 AUTO-FILL TRIGGERED for game ID: {game_data.get('id')}")
     
     # Extract scores from ESPN data structure
     home_score = int(game_data.get('home_score', 0) or 0)
     away_score = int(game_data.get('away_score', 0) or 0)
     
-    # Parse time from clock (e.g., "12:34" or "12:34.5")
+    # Don't show "0" unless it's an actual score from live game
+    if home_score == 0 and not game_data.get('is_live'):
+        home_score = None
+    if away_score == 0 and not game_data.get('is_live'):
+        away_score = None
+    
+    # Parse time from clock
     minutes_left = 0
     seconds_left = 0
     
     clock = game_data.get('clock', '0:00')
     period = game_data.get('period', 2)
     is_live = game_data.get('is_live', False)
-    state = game_data.get('state', 'unknown')
-    
-    print(f"DEBUG: Raw game data - Clock: {clock}, Period: {period}, State: {state}, IsLive: {is_live}")
     
     if is_live and clock:
         try:
             if ':' in clock:
                 time_parts = clock.split(':')
                 minutes_left = int(time_parts[0])
-                # Handle seconds with decimals
-                seconds_part = time_parts[1].split('.')[0]  # Remove decimal part
+                seconds_part = time_parts[1].split('.')[0]
                 seconds_left = int(seconds_part)
                 
-                # Automatically convert first half time to full game time remaining
-                if period == 1:  # First half - add 20 minutes for entire second half
-                    original_mins = minutes_left
+                # Auto-convert to full game time: add 20 min if first half
+                if period == 1:
                     minutes_left += 20
-                    print(f"DEBUG: ✅ First half conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
-                else:
-                    print(f"DEBUG: ✅ Second half time kept as-is: {minutes_left}:{seconds_left:02d}")
-        except (ValueError, IndexError) as e:
-            print(f"DEBUG: ❌ Error parsing clock '{clock}': {e}")
+        except (ValueError, IndexError):
             minutes_left = 0
             seconds_left = 0
     
     # Get betting odds total for live_total - ONLY if betting line exists
     live_total = None
     if betting_odds_data and game_data:
-        # Get team names for matching with betting data
         away_team_name = game_data.get('away_team', '')
         home_team_name = game_data.get('home_team', '')
         
-        # Try to match with betting data using team names
         match_key1 = f"{away_team_name}|{home_team_name}"
         match_key2 = f"{home_team_name}|{away_team_name}"
         
@@ -1659,35 +2072,118 @@ def auto_fill_from_game(game_data, betting_odds_data):
         if betting_info:
             live_total = betting_info.get('avg_total')
             if live_total:
-                print(f"DEBUG: ✅ Found betting total for {away_team_name} @ {home_team_name}: {live_total}")
-            else:
-                print(f"DEBUG: ⚠️ No betting total in matched data for {away_team_name} @ {home_team_name}")
-        else:
-            print(f"DEBUG: ⚠️ No betting data match for {away_team_name} @ {home_team_name}")
-            print(f"DEBUG: ⚠️ Available betting keys: {list(betting_odds_data.keys())[:5]}...")  # Show first 5 keys
-    else:
-        print(f"DEBUG: ⚠️ No betting odds data available or no game data")
+                print(f"DEBUG: ✅ Found betting total: {live_total}")
     
-    # DO NOT use ESPN fallback - leave live_total empty if no betting line
+    # Leave live_total as None if no betting line found
     if live_total is None:
-        print(f"DEBUG: ❌ No betting line found - leaving Live Total empty")
+        print(f"DEBUG: No betting line found - leaving Live Total empty")
     
-    away_team = game_data.get('away_team', 'Away')
-    home_team = game_data.get('home_team', 'Home')
-    
-    print(f"DEBUG: ✅ AUTO-FILLING COMPLETE:")
-    print(f"DEBUG:   - Game: {away_team} @ {home_team}")
-    print(f"DEBUG:   - Scores: Away {away_score} - Home {home_score}")
-    print(f"DEBUG:   - Time: {minutes_left}:{seconds_left:02d}")
-    print(f"DEBUG:   - Live Total: {live_total} (from betting odds)")
+    print(f"DEBUG: Auto-filling - away:{away_score}, home:{home_score}, total:{live_total}, time:{minutes_left}:{seconds_left:02d}")
     
     return (
-        away_score,  # team1 = away team score
-        home_score,  # team2 = home team score
-        live_total,  # live_total from betting odds or ESPN fallback
+        away_score,
+        home_score,
+        live_total,
         minutes_left,
         seconds_left
     )
+
+@app.callback(
+    [Output("team1", "value", allow_duplicate=True),
+     Output("team2", "value", allow_duplicate=True),
+     Output("mins_left", "value", allow_duplicate=True),
+     Output("secs_left", "value", allow_duplicate=True)],
+    Input("refresh_game_button", "n_clicks"),
+    [State("persistent_game_selection", "data"),
+     State("live_games_data", "data")],
+    prevent_initial_call=True
+)
+def refresh_game_data(n_clicks, selected_game_data, games_data):
+    """Refresh only the scores and time from ESPN without changing other inputs"""
+    if not n_clicks or not selected_game_data:
+        raise dash.exceptions.PreventUpdate
+    
+    # Get the selected game ID
+    game_id = selected_game_data.get('id')
+    if not game_id:
+        raise dash.exceptions.PreventUpdate
+    
+    try:
+        # Fetch fresh data from ESPN for this specific game
+        fresh_games = fetch_live_games()  # Gets current live games
+        
+        # Find our specific game in the fresh data
+        fresh_game_data = None
+        for game in fresh_games:
+            if str(game.get('id')) == str(game_id):
+                fresh_game_data = game
+                break
+        
+        if not fresh_game_data:
+            print(f"DEBUG: Could not find game {game_id} in fresh ESPN data")
+            raise dash.exceptions.PreventUpdate
+        
+        # Extract fresh scores and time
+        home_score = fresh_game_data.get('home_score')
+        away_score = fresh_game_data.get('away_score')
+        
+        # Handle time parsing with first/second half conversion
+        minutes_left = None
+        seconds_left = None
+        
+        if fresh_game_data.get('is_live') and fresh_game_data.get('clock'):
+            try:
+                clock = fresh_game_data.get('clock', '0:00')
+                period = fresh_game_data.get('period', 2)
+                
+                if ':' in clock:
+                    time_parts = clock.split(':')
+                    minutes_left = int(time_parts[0])
+                    seconds_part = time_parts[1].split('.')[0]  # Remove decimal part
+                    seconds_left = int(seconds_part)
+                    
+                    # No automatic conversion - user controls via First Half toggle
+            except (ValueError, IndexError):
+                minutes_left = None
+                seconds_left = None
+        
+        print(f"DEBUG: Refreshed scores - Home: {home_score}, Away: {away_score}, Time: {minutes_left}:{seconds_left:02d}")
+        
+        return (
+            home_score if home_score is not None else dash.no_update,
+            away_score if away_score is not None else dash.no_update, 
+            minutes_left if minutes_left is not None else dash.no_update,
+            seconds_left if seconds_left is not None else dash.no_update
+        )
+        
+    except Exception as e:
+        print(f"DEBUG: Error refreshing game data: {e}")
+        raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output("mins_left", "value", allow_duplicate=True),
+    Input("first_half_toggle", "value"),
+    State("mins_left", "value"),
+    prevent_initial_call=True
+)
+def handle_first_half_toggle(toggle_value, current_mins):
+    """Handle first half toggle - add/subtract 20 minutes"""
+    if current_mins is None:
+        current_mins = 0
+    
+    is_first_half_checked = "first_half" in (toggle_value or [])
+    
+    # Determine if we should add or subtract 20
+    if is_first_half_checked:
+        # Toggle was just checked - add 20 minutes
+        new_mins = current_mins + 20
+        print(f"DEBUG: First Half toggle CHECKED - Adding 20: {current_mins} → {new_mins}")
+    else:
+        # Toggle was just unchecked - subtract 20 minutes (but not below 0)
+        new_mins = max(0, current_mins - 20)
+        print(f"DEBUG: First Half toggle UNCHECKED - Subtracting 20: {current_mins} → {new_mins}")
+    
+    return new_mins
 
 @app.callback(
     Output("output", "children"),
@@ -1696,9 +2192,10 @@ def auto_fill_from_game(game_data, betting_odds_data):
     Input("period_type", "value"), Input("threshold_slider", "value")
 )
 def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
-    mins = mins or 0
-    secs = secs or 0
-    min_left = mins + secs / 60
+    # Handle None values for calculation without forcing UI display
+    mins_calc = mins if mins is not None else 0
+    secs_calc = secs if secs is not None else 0
+    min_left = mins_calc + secs_calc / 60
     
     if None in [t1, t2, live_total, period] or min_left <= 0:
         return html.Div([
@@ -1714,18 +2211,16 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
     curr = r['actual_pace']
     req = r['required_pace']
     
-    # Signal logic - Fixed to be less restrictive for Under signals
+    # Signal logic
     if pct >= 25 and over_thresh:
         signal, signal_color, border_color = "Under", "#4ade80", "#4ade8044"
-    elif pct >= 5 and over_thresh:  # Lowered from 10 to 5
+    elif pct >= 10 and over_thresh:
         signal, signal_color, border_color = "Under", "#86efac", "#86efac33"
-    elif pct >= 0 and over_thresh:  # NEW: Show Under for any positive % when over threshold
-        signal, signal_color, border_color = "Under", "#a7f3d0", "#a7f3d033"
-    elif not over_thresh:  # Required pace below threshold - Hold
+    elif pct >= 0 or not over_thresh:
         signal, signal_color, border_color = "Hold", "#71717a", "#71717a33"
-    elif pct >= -15:  # Negative percentage but not too bad - Hold
+    elif pct >= -15:
         signal, signal_color, border_color = "Hold", "#fbbf24", "#fbbf2433"
-    else:  # Very negative percentage - Pass
+    else:
         signal, signal_color, border_color = "Pass", "#f87171", "#f8717133"
 
     # Pace visualization - line chart
@@ -1933,9 +2428,13 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
         betting_info = None
         if betting_odds_data:
             # Try to match with betting data using team names
-            match_key1 = f"{away_team_name}|{home_team_name}"
-            match_key2 = f"{home_team_name}|{away_team_name}"
-            betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
+            match_key = f"{away_team_name}|{home_team_name}"
+            betting_info = betting_odds_data.get(match_key)
+            
+            # Try reverse if not found
+            if not betting_info:
+                reverse_key = f"{home_team_name}|{away_team_name}"
+                betting_info = betting_odds_data.get(reverse_key)
         
         return html.Div([
         html.Div([
@@ -1974,12 +2473,10 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                 ], className="text-center", width=4),
                 dbc.Col([
                     html.Div([
-                        html.Div("Line pts/min" if betting_info else "Avg Scoring", className="metric-label"),
+                        html.Div("Avg Scoring", className="metric-label"),
                         html.Div(
-                            f"{(betting_info['avg_total'] / 40):.2f}" if betting_info 
-                            else f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}",
-                            style={"fontSize": "1.6rem" if betting_info else "1.2rem", "fontWeight": "700" if betting_info else "600", 
-                                   "color": "#10d9c4" if betting_info else "#d4d4d8", "lineHeight": "1"})
+                            f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}",
+                            style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#d4d4d8", "lineHeight": "1"})
                     ])
                 ], className="text-center", width=4),
             ], className="mb-4"),
@@ -2099,9 +2596,6 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
     Output("games-display", "children"),
     Output("team1_selector", "options"),
     Output("team2_selector", "options"),
-    Output("today-btn", "color"),
-    Output("tomorrow-btn", "color"),
-    Output("week-btn", "color"),
     Input("today-btn", "n_clicks"),
     Input("tomorrow-btn", "n_clicks"),
     Input("week-btn", "n_clicks"),
@@ -2113,23 +2607,23 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
     prevent_initial_call=True
 )
 def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab, today_games, tomorrow_games, week_games, betting_odds_data):
-    """Update games display and button states based on selection or auto-load Today when tab opens"""
+    """Update games display based on button selection or auto-load Today when tab opens"""
     ctx_triggered = ctx.triggered[0]['prop_id'] if ctx.triggered else ''
     
-    # Determine which button should be selected and what data to show
-    if 'tomorrow-btn' in ctx_triggered:
+    # Auto-load Today's games when Research tab is opened
+    if 'main-tabs' in ctx_triggered and active_tab == "analysis-tab":
+        games_to_show = today_games or []
+        title = "Today's Games"
+    # Handle button clicks
+    elif 'tomorrow-btn' in ctx_triggered:
         games_to_show = tomorrow_games or []
         title = "Tomorrow's Games"
-        button_colors = ("secondary", "primary", "secondary")  # Today, Tomorrow, Week
     elif 'week-btn' in ctx_triggered:
         games_to_show = week_games or []
         title = "This Week's Games"
-        button_colors = ("secondary", "secondary", "primary")
     else:
-        # Default to Today (including when Research tab opens)
         games_to_show = today_games or []
         title = "Today's Games"
-        button_colors = ("primary", "secondary", "secondary")
     
     if not games_to_show:
         games_content = html.Div([
@@ -2137,12 +2631,6 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab,
                    className="text-center text-muted py-4")
         ])
         team_options = []
-        return (dbc.CardBody(games_content), 
-                team_options, 
-                team_options, 
-                button_colors[0],  # Today button color
-                button_colors[1],  # Tomorrow button color  
-                button_colors[2])  # Week button color
     else:
         games_content = html.Div([
             html.Div([
@@ -2169,12 +2657,7 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab,
         # Sort team options alphabetically for easier searching
         team_options.sort(key=lambda x: x['label'])
     
-    return (dbc.CardBody(games_content), 
-            team_options, 
-            team_options, 
-            button_colors[0],  # Today button color
-            button_colors[1],  # Tomorrow button color  
-            button_colors[2])  # Week button color
+    return dbc.CardBody(games_content), team_options, team_options
 
 # Auto-populate team selectors when game is clicked
 @app.callback(
@@ -2246,9 +2729,13 @@ def create_game_card(game, betting_odds_data=None):
         if betting_info:
             betting_total = betting_info.get('avg_total')
     
-    # Parse game time for upcoming games
+    # Parse game time for display with first/second half conversion
     time_display = game['clock']
-    if game['state'] == 'pre':
+    
+    if game['is_live']:
+        # Show raw ESPN time - user controls conversion with toggle
+        time_display = game['clock']
+    elif game['state'] == 'pre':
         try:
             dt_est = convert_utc_to_est(game['date'])
             if dt_est:
@@ -2380,10 +2867,9 @@ def update_games_count_display(games_count):
     Input("team2_selector", "value"),
     Input("games_count_input", "value"),
     State("team1_selector", "options"),
-    State("team2_selector", "options"),
-    State("betting_odds_data", "data")
+    State("team2_selector", "options")
 )
-def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options, betting_odds_data):
+def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options):
     """Update team comparison analysis display"""
     if not team1_id and not team2_id:
         return dbc.CardBody([
@@ -2425,35 +2911,13 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
         implied_total = team1_stats['avg_team_score'] + team2_stats['avg_team_score']
         implied_total_per_min = implied_total / 40
         
-        # Get betting line for this matchup
-        betting_info = None
-        if betting_odds_data and team1_name and team2_name:
-            # Try both possible key combinations
-            match_key1 = f"{team1_name}|{team2_name}"
-            match_key2 = f"{team2_name}|{team1_name}"
-            betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
-        
         comparison_content.extend([
             html.Div([
                 html.H6("Team Comparison", style={"color": "#e5e5e5", "textAlign": "center"}),
-                
-                dbc.Row([
-                    dbc.Col([
-                        html.Div([
-                            html.Div("Projected Total pts/min", className="metric-label"),
-                            html.Div(f"{implied_total_per_min:.2f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
-                        ])
-                    ], className="text-center", width=6),
-                    dbc.Col([
-                        html.Div([
-                            html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
-                            html.Div(
-                                f"{betting_info['avg_total']:.1f} ({betting_info['avg_total'] / 40:.2f} pts/min)" if betting_info else "No Line", 
-                                style={"fontSize": "1.4rem", "fontWeight": "700", 
-                                       "color": "#10d9c4" if betting_info else "#71717a"})
-                        ])
-                    ], className="text-center", width=6),
-                ], className="mb-4")
+                html.Div([
+                    html.Span("Implied Total pts/min: ", style={"fontSize": "0.9rem", "color": "#666"}),
+                    html.Span(f"{implied_total_per_min:.2f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
+                ], className="text-center mb-4")
             ]),
             
             dbc.Row([
@@ -2468,12 +2932,6 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team1_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#4ade80", "textAlign": "center"}),
-                    html.Div("PTS/MIN", className="metric-label text-center mt-2"),
-                    html.Div(f"{team1_stats['avg_points_per_minute']:.2f}", 
-                            style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b", "textAlign": "center"}),
-                    html.Div("vs OPP", className="metric-label text-center mt-2"),
-                    html.Div(f"{team1_stats['avg_opp_score']:.1f}", 
-                            style={"fontSize": "1.2rem", "color": "#f87171", "textAlign": "center"}),
                 ], width=5),
                 
                 # VS Column
@@ -2493,12 +2951,6 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team2_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#3b82f6", "textAlign": "center"}),
-                    html.Div("PTS/MIN", className="metric-label text-center mt-2"),
-                    html.Div(f"{team2_stats['avg_points_per_minute']:.2f}", 
-                            style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b", "textAlign": "center"}),
-                    html.Div("vs OPP", className="metric-label text-center mt-2"),
-                    html.Div(f"{team2_stats['avg_opp_score']:.1f}", 
-                            style={"fontSize": "1.2rem", "color": "#f87171", "textAlign": "center"}),
                 ], width=5),
             ], className="mb-4"),
             
@@ -2536,11 +2988,6 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                 dbc.Col([
                     html.Div("TOTAL PPG", className="metric-label"),
                     html.Div(f"{team_stats['avg_total']:.1f}", 
-                            style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#f59e0b"})
-                ], className="text-center"),
-                dbc.Col([
-                    html.Div("PTS/MIN", className="metric-label"),
-                    html.Div(f"{team_stats['avg_points_per_minute']:.2f}", 
                             style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#f59e0b"})
                 ], className="text-center"),
                 dbc.Col([
@@ -2594,6 +3041,26 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
         ])
     
     return dbc.CardBody(comparison_content)
+
+# Game Reminder Callbacks
+@app.callback(
+    Output("game_reminder_store", "data"),
+    Input("game_reminder_input", "value"),
+    prevent_initial_call=True
+)
+def save_game_reminder(value):
+    return value or ""
+
+@app.callback(
+    Output("game_reminder_input", "value"),
+    Input("refresh_games", "n_intervals"),
+    State("game_reminder_store", "data"),
+    prevent_initial_call=True
+)
+def load_game_reminder_on_startup(n_intervals, stored_value):
+    if n_intervals == 0 and stored_value:
+        return stored_value
+    raise dash.exceptions.PreventUpdate
 
 
 if __name__ == "__main__":
