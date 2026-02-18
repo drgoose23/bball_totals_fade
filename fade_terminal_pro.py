@@ -303,10 +303,35 @@ app.index_string = '''
             ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
             ::-webkit-scrollbar-thumb:hover { background: #444; }
 
-            /* Hide number spinners */
+            /* Hide number spinners globally */
             input[type="number"]::-webkit-outer-spin-button,
             input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
             input[type="number"] { -moz-appearance: textfield; }
+
+            /* Tiny nudge buttons for time/total */
+            .nudge-btn {
+                background: #222 !important;
+                border: 1px solid #333 !important;
+                color: #666 !important;
+                border-radius: 3px !important;
+                font-size: 0.6rem !important;
+                padding: 0 !important;
+                width: 18px !important;
+                height: 14px !important;
+                line-height: 12px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                cursor: pointer !important;
+            }
+            .nudge-btn:hover { color: #fff !important; border-color: #4a9eff !important; }
+            .nudge-wrap {
+                display: flex;
+                flex-direction: column;
+                gap: 1px;
+                margin-left: 4px;
+                justify-content: center;
+            }
         </style>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
@@ -866,17 +891,35 @@ def create_fade_tab():
                     
                     html.Div([
                         html.Div("Live Total", className="label"),
-                        dbc.Input(id="live_total", type="number"),
+                        html.Div([
+                            dbc.Input(id="live_total", type="number", style={"flex": "1"}),
+                            html.Div([
+                                html.Button("▲", id="live_total_up", className="nudge-btn", n_clicks=0),
+                                html.Button("▼", id="live_total_down", className="nudge-btn", n_clicks=0),
+                            ], className="nudge-wrap")
+                        ], style={"display": "flex", "alignItems": "center"})
                     ], className="mb-3"),
                     
                     dbc.Row([
                         dbc.Col([
                             html.Div("Minutes", className="label"),
-                            dbc.Input(id="mins_left", type="number", min=0)
+                            html.Div([
+                                dbc.Input(id="mins_left", type="number", min=0, style={"flex": "1"}),
+                                html.Div([
+                                    html.Button("▲", id="mins_up", className="nudge-btn", n_clicks=0),
+                                    html.Button("▼", id="mins_down", className="nudge-btn", n_clicks=0),
+                                ], className="nudge-wrap")
+                            ], style={"display": "flex", "alignItems": "center"})
                         ], width=6),
                         dbc.Col([
                             html.Div("Seconds", className="label"),
-                            dbc.Input(id="secs_left", type="number", min=0, max=59)
+                            html.Div([
+                                dbc.Input(id="secs_left", type="number", min=0, max=59, style={"flex": "1"}),
+                                html.Div([
+                                    html.Button("▲", id="secs_up", className="nudge-btn", n_clicks=0),
+                                    html.Button("▼", id="secs_down", className="nudge-btn", n_clicks=0),
+                                ], className="nudge-wrap")
+                            ], style={"display": "flex", "alignItems": "center"})
                         ], width=6),
                     ], className="mb-2"),
                     
@@ -1015,6 +1058,51 @@ def switch_tabs(active_tab):
     if active_tab == "analysis-tab":
         return create_analysis_tab()
     return create_fade_tab()
+
+@app.callback(
+    Output("live_total", "value", allow_duplicate=True),
+    Input("live_total_up", "n_clicks"),
+    Input("live_total_down", "n_clicks"),
+    State("live_total", "value"),
+    prevent_initial_call=True
+)
+def nudge_live_total(up, down, val):
+    val = val or 0
+    if ctx.triggered_id == "live_total_up":
+        return val + 0.5
+    elif ctx.triggered_id == "live_total_down":
+        return max(0, val - 0.5)
+    raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output("mins_left", "value", allow_duplicate=True),
+    Input("mins_up", "n_clicks"),
+    Input("mins_down", "n_clicks"),
+    State("mins_left", "value"),
+    prevent_initial_call=True
+)
+def nudge_mins(up, down, val):
+    val = val or 0
+    if ctx.triggered_id == "mins_up":
+        return val + 1
+    elif ctx.triggered_id == "mins_down":
+        return max(0, val - 1)
+    raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output("secs_left", "value", allow_duplicate=True),
+    Input("secs_up", "n_clicks"),
+    Input("secs_down", "n_clicks"),
+    State("secs_left", "value"),
+    prevent_initial_call=True
+)
+def nudge_secs(up, down, val):
+    val = val or 0
+    if ctx.triggered_id == "secs_up":
+        return min(59, val + 1)
+    elif ctx.triggered_id == "secs_down":
+        return max(0, val - 1)
+    raise dash.exceptions.PreventUpdate
 
 @app.callback(Output("thresh_val", "children"), Input("threshold_slider", "value"))
 def show_thresh(v): return f"{v}"
