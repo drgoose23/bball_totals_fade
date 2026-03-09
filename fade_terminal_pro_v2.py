@@ -4,13 +4,19 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import requests
 from datetime import datetime, timedelta, timezone
+import json
 
-ODDS_API_KEY = 'c352f4d244a2a3ae32f32136f8d908ac'
+ODDS_API_KEY = 'c9aaca97ab2496374d156e483571b6c6'
 ODDS_BASE_URL = 'https://api.the-odds-api.com/v4'
+
+# Track API usage locally
+odds_api_calls_today = 0
+odds_api_last_reset = datetime.now().strftime('%Y-%m-%d')
 
 app = dash.Dash(__name__, external_stylesheets=[
     dbc.themes.BOOTSTRAP,
-    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
 ], suppress_callback_exceptions=True)
 
 def convert_utc_to_est(utc_time_str):
@@ -18,11 +24,9 @@ def convert_utc_to_est(utc_time_str):
     try:
         # Parse UTC time from ESPN API
         dt_utc = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
-        
+       
         year = dt_utc.year
-        
-        # Approximate DST dates (this covers most cases accurately)
-        # DST starts 2nd Sunday in March, ends 1st Sunday in November
+       
         march_second_sunday = 8 + (6 - datetime(year, 3, 8).weekday()) % 7
         nov_first_sunday = 1 + (6 - datetime(year, 11, 1).weekday()) % 7
         
@@ -49,352 +53,294 @@ app.index_string = '''
 <html>
     <head>
         {%metas%}
-        <title>Fade System</title>
+        <title>CBB Fade Terminal</title>
         {%favicon%}
         {%css%}
         <style>
+            * { box-sizing: border-box; }
+
             body {
-                background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-                font-family: 'Inter', sans-serif;
-                color: #e2e8f0;
-                font-weight: 400;
+                background: #111;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                color: #e5e5e5;
+                line-height: 1.5;
+                min-height: 100vh;
             }
-            .card {
-                background: rgba(26, 32, 44, 0.8);
-                border: 1px solid rgba(74, 85, 104, 0.3);
-                border-radius: 12px;
-                backdrop-filter: blur(8px);
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-            }
-            .form-control {
-                background: rgba(26, 32, 44, 0.7) !important;
-                border: 1px solid rgba(74, 85, 104, 0.4) !important;
-                color: #e2e8f0 !important;
-                font-weight: 400;
-                border-radius: 6px !important;
-                font-size: 0.9rem;
-                padding: 0.6rem 0.8rem;
-                transition: all 0.2s ease;
-            }
-            .form-control:focus {
-                border-color: #4a5568 !important;
-                box-shadow: 0 0 0 2px rgba(74, 85, 104, 0.2) !important;
-            }
-            .form-control::placeholder { color: #718096 !important; }
-            .btn-adj {
-                background: rgba(74, 85, 104, 0.15) !important;
-                border: 1px solid rgba(74, 85, 104, 0.2) !important;
-                color: #a0aec0 !important;
-                font-weight: 500;
-                border-radius: 4px;
-                transition: all 0.2s ease;
-                font-size: 0.8rem;
-                padding: 0.25rem 0.5rem;
-                min-width: 32px;
-            }
-            .btn-adj:hover { 
-                background: rgba(74, 85, 104, 0.25) !important; 
-                color: #e2e8f0 !important;
-                border-color: rgba(74, 85, 104, 0.3) !important;
-            }
-            .btn-adj:active {
-                background: rgba(74, 85, 104, 0.35) !important;
-                transform: scale(0.95);
-            }
-            .label { 
-                font-size: 0.75rem; 
-                color: #a0aec0; 
-                text-transform: uppercase; 
-                letter-spacing: 0.8px; 
-                margin-bottom: 0.5rem; 
-                font-weight: 500;
+
+            /* Cards */
+            .card, .pro-card {
+                background: #1a1a1a;
+                border: 1px solid #2a2a2a;
+                border-radius: 10px;
+                padding: 1.5rem;
             }
             .output-card {
-                background: rgba(24, 24, 27, 0.9);
-                border: 1px solid rgba(39, 39, 42, 0.6);
-                border-radius: 20px;
-                backdrop-filter: blur(12px);
-                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+                background: #1a1a1a;
+                border: 1px solid #2a2a2a;
+                border-radius: 10px;
             }
-            .metric-value { 
+
+            /* Inputs */
+            .form-control {
+                background: #1a1a1a !important;
+                border: 1px solid #333 !important;
+                color: #e5e5e5 !important;
+                border-radius: 6px !important;
+                font-size: 0.9rem;
+                padding: 0.5rem 0.75rem;
+            }
+            .form-control:focus {
+                border-color: #4a9eff !important;
+                box-shadow: none !important;
+                background: #1a1a1a !important;
+            }
+            .form-control::placeholder { color: #555 !important; }
+            .input-group-text {
+                background: #1a1a1a !important;
+                border: 1px solid #333 !important;
+                color: #888 !important;
+                border-radius: 6px !important;
+            }
+
+            /* Score +/- buttons */
+            .btn-adj {
+                background: #222 !important;
+                border: 1px solid #333 !important;
+                color: #999 !important;
+                border-radius: 6px;
                 font-weight: 600;
+                font-size: 0.85rem;
+                min-width: 36px;
+                height: 36px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .btn-adj:hover { background: #2a2a2a !important; color: #fff !important; border-color: #4a9eff !important; }
+
+            /* Small +/- buttons */
+            .btn-adj-small, .btn-micro {
+                background: #222 !important;
+                border: 1px solid #333 !important;
+                color: #777 !important;
+                border-radius: 4px !important;
+                font-size: 0.7rem !important;
+                padding: 0.15rem 0.35rem !important;
+                min-width: 24px !important;
+                height: 22px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            .btn-adj-small:hover, .btn-micro:hover { color: #fff !important; border-color: #4a9eff !important; }
+
+            /* Labels */
+            .label {
+                font-size: 0.7rem;
+                color: #888;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                margin-bottom: 0.4rem;
+                font-weight: 600;
+            }
+            .metric-value {
+                font-family: 'SF Mono', 'Consolas', monospace;
+                font-weight: 700;
                 font-size: 2rem;
-                letter-spacing: -0.02em;
+                color: #fff;
                 line-height: 1;
             }
             .metric-label {
-                font-size: 0.75rem;
-                font-weight: 500;
+                font-size: 0.7rem;
+                font-weight: 600;
                 letter-spacing: 1px;
                 text-transform: uppercase;
-                color: #a0aec0;
-                margin-bottom: 0.25rem;
+                color: #888;
+                margin-bottom: 0.3rem;
             }
-            .pro-card {
-                background: rgba(26, 32, 44, 0.9);
-                border: 1px solid rgba(74, 85, 104, 0.25);
-                border-radius: 12px;
-                padding: 1.5rem;
-                backdrop-filter: blur(10px);
-                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+
+            /* Dropdowns */
+            .dark-dropdown .Select-control {
+                background: #1a1a1a !important;
+                border: 1px solid #333 !important;
+                color: #e5e5e5 !important;
+                border-radius: 6px !important;
+                min-height: 38px;
+                font-size: 0.85rem;
             }
-            /* Professional Dropdown Styling */
-            .dark-dropdown .Select-control { 
-                background: rgba(26, 32, 44, 0.9) !important; 
-                border: 1px solid rgba(74, 85, 104, 0.4) !important; 
-                color: #e2e8f0 !important; 
-                border-radius: 8px !important;
-                min-height: 42px;
-                font-size: 0.9rem;
-                font-family: 'SF Mono', Consolas, monospace;
-                font-weight: 500;
-                transition: all 0.2s ease;
+            .dark-dropdown .Select-placeholder { color: #555 !important; }
+            .dark-dropdown .Select-value-label { color: #e5e5e5 !important; font-weight: 500; }
+            .dark-dropdown .Select-input > input { color: #e5e5e5 !important; }
+            .dark-dropdown .Select-menu-outer {
+                background: #1a1a1a !important;
+                border: 1px solid #333 !important;
+                border-radius: 6px !important;
+                margin-top: 2px;
             }
-            .dark-dropdown .Select-control:hover {
-                border-color: rgba(74, 85, 104, 0.6) !important;
-                background: rgba(26, 32, 44, 0.95) !important;
-            }
-            .dark-dropdown .Select-placeholder { 
-                color: #718096 !important; 
-                font-weight: 400; 
-                font-family: 'Inter', sans-serif;
-            }
-            .dark-dropdown .Select-value-label { 
-                color: #f7fafc !important; 
-                font-weight: 500; 
-                font-family: 'SF Mono', Consolas, monospace;
-            }
-            .dark-dropdown .Select-input > input { 
-                color: #e2e8f0 !important; 
-                font-family: 'SF Mono', Consolas, monospace;
-            }
-            .dark-dropdown .Select-menu-outer { 
-                background: rgba(26, 32, 44, 0.98) !important; 
-                border: 1px solid rgba(74, 85, 104, 0.4) !important; 
-                border-radius: 8px !important;
-                backdrop-filter: blur(12px);
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-                max-height: 300px;
-            }
-            .dark-dropdown .Select-menu { 
+            .dark-dropdown .Select-menu { background: transparent !important; }
+            .dark-dropdown .Select-option {
+                color: #aaa !important;
                 background: transparent !important;
-                max-height: 280px;
+                padding: 8px 12px !important;
+                font-size: 0.85rem;
             }
-            .dark-dropdown .Select-option { 
-                color: #cbd5e0 !important; 
-                background: transparent !important; 
-                padding: 12px 16px !important;
-                font-size: 0.9rem;
-                font-family: 'SF Mono', Consolas, monospace;
-                font-weight: 500;
-                transition: all 0.15s ease;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            .dark-dropdown .Select-option.is-focused { 
-                background: rgba(74, 85, 104, 0.2) !important; 
-                color: #f7fafc !important; 
-            }
-            .dark-dropdown .Select-option.is-selected { 
-                background: rgba(74, 85, 104, 0.3) !important; 
-                color: #ffffff !important; 
-            }
-            
-            /* Professional Button Styling */
+            .dark-dropdown .Select-option.is-focused { background: #252525 !important; color: #fff !important; }
+            .dark-dropdown .Select-option.is-selected { background: #222 !important; color: #4a9eff !important; }
+
+            /* Buttons */
             .btn-primary {
-                background: #2d3748 !important;
+                background: #4a9eff !important;
                 border: none !important;
                 border-radius: 6px !important;
-                font-weight: 500 !important;
-                padding: 0.5rem 1rem !important;
+                font-weight: 600 !important;
+                color: #fff !important;
                 font-size: 0.85rem !important;
-                transition: all 0.2s ease !important;
-                box-shadow: none !important;
-                color: #e2e8f0 !important;
             }
-            .btn-primary:hover {
-                background: #4a5568 !important;
-                color: #f7fafc !important;
-            }
-            .btn-primary:active {
-                background: #1a202c !important;
-                transform: scale(0.98) !important;
-            }
+            .btn-primary:hover { background: #3a8eef !important; }
             .btn-secondary {
-                background: rgba(45, 55, 72, 0.1) !important;
-                border: 1px solid rgba(45, 55, 72, 0.2) !important;
-                color: #a0aec0 !important;
+                background: #222 !important;
+                border: 1px solid #333 !important;
+                color: #aaa !important;
                 border-radius: 6px !important;
-                font-weight: 500 !important;
-                padding: 0.5rem 1rem !important;
                 font-size: 0.85rem !important;
-                transition: all 0.2s ease !important;
             }
-            .btn-secondary:hover {
-                background: rgba(45, 55, 72, 0.15) !important;
-                border-color: rgba(45, 55, 72, 0.3) !important;
-                color: #e2e8f0 !important;
-            }
-            .btn-secondary:active {
-                background: rgba(45, 55, 72, 0.25) !important;
-                transform: scale(0.98) !important;
-            }
-            
-            /* Professional Slider */
-            .rc-slider {
-                background: rgba(74, 85, 104, 0.3) !important;
-                border-radius: 3px !important;
-                height: 4px !important;
-            }
-            .rc-slider-track {
-                background: #4a5568 !important;
-                border-radius: 3px !important;
-                height: 4px !important;
-            }
+            .btn-secondary:hover { background: #2a2a2a !important; color: #fff !important; }
+
+            /* Slider */
+            .rc-slider { background: #2a2a2a !important; height: 4px !important; }
+            .rc-slider-track { background: #4a9eff !important; height: 4px !important; }
             .rc-slider-handle {
-                background: #e2e8f0 !important;
-                border: 2px solid #4a5568 !important;
-                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
-                width: 18px !important;
-                height: 18px !important;
-                margin-top: -7px !important;
+                background: #fff !important;
+                border: 2px solid #4a9eff !important;
+                width: 16px !important;
+                height: 16px !important;
+                margin-top: -6px !important;
+                box-shadow: none !important;
             }
-            .rc-slider-mark-text {
-                color: #a0aec0 !important;
-                font-size: 0.75rem !important;
+            .rc-slider-mark-text { color: #666 !important; font-size: 0.7rem !important; }
+
+            /* Tabs */
+            .nav-tabs {
+                border-bottom: 1px solid #2a2a2a;
             }
-            
-            /* Game Selection Modal */
-            .game-selector-btn:hover {
-                background: rgba(26, 32, 44, 0.95) !important;
-                border-color: rgba(74, 85, 104, 0.6) !important;
-                transform: translateY(-1px);
-            }
-            
-            .game-card {
-                background: rgba(26, 32, 44, 0.6);
-                border: 1px solid rgba(74, 85, 104, 0.3);
-                border-radius: 8px;
-                padding: 1rem;
-                margin: 0.5rem 0;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                font-family: 'SF Mono', Consolas, monospace;
-            }
-            
-            .game-card:hover {
-                background: rgba(74, 85, 104, 0.2);
-                border-color: rgba(74, 85, 104, 0.5);
-                transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            }
-            
-            .game-time {
-                color: #68d391;
-                font-weight: 600;
-                font-size: 0.9rem;
-                margin-bottom: 0.5rem;
-            }
-            
-            .game-matchup {
-                color: #e2e8f0;
+            .nav-tabs .nav-link {
+                background: transparent;
+                border: none;
+                color: #888;
                 font-weight: 500;
-                font-size: 1rem;
-                margin-bottom: 0.25rem;
+                padding: 0.6rem 1.2rem;
+                border-radius: 6px 6px 0 0;
+                font-size: 0.85rem;
             }
-            
-            .game-details {
-                color: #a0aec0;
-                font-size: 0.8rem;
+            .nav-tabs .nav-link:hover { color: #e5e5e5; }
+            .nav-tabs .nav-link.active {
+                color: #4a9eff;
+                background: transparent;
+                border-bottom: 2px solid #4a9eff;
             }
-            
-            .live-indicator {
-                color: #f56565;
+
+            /* Headings - just white, no gradients */
+            h1, h2, h3, h4, h5, h6 {
+                font-family: 'Inter', sans-serif;
                 font-weight: 600;
-                font-size: 0.8rem;
+                color: #fff;
+                -webkit-text-fill-color: #fff;
+                background: none;
             }
-            
-            /* Analysis Game Cards */
-            .analysis-game-card:hover {
-                background: rgba(74, 85, 104, 0.15) !important;
-                border-color: rgba(74, 85, 104, 0.4) !important;
-                transform: translateY(-1px);
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+            /* Game selector button */
+            .game-selector-btn {
+                background: #1a1a1a !important;
+                border: 1px solid #333 !important;
+                border-radius: 6px !important;
             }
-            
-            /* Team Logos */
+            .game-selector-btn:hover { border-color: #4a9eff !important; }
+
+            /* Game cards in modal */
+            .game-card {
+                background: #1e1e1e;
+                border: 1px solid #2a2a2a;
+                border-radius: 8px;
+                padding: 0.8rem 1rem;
+                margin: 0.4rem 0;
+                cursor: pointer;
+            }
+            .game-card:hover { background: #252525; border-color: #4a9eff; }
+            .game-time { color: #4a9eff; font-weight: 600; font-size: 0.8rem; margin-bottom: 0.3rem; }
+            .game-matchup { color: #e5e5e5; font-weight: 500; font-size: 0.9rem; }
+            .game-details { color: #888; font-size: 0.8rem; }
+            .live-indicator { color: #ef4444; font-weight: 600; font-size: 0.75rem; }
+
+            /* Analysis cards */
+            .analysis-game-card {
+                background: #1e1e1e !important;
+                border: 1px solid #2a2a2a !important;
+                border-radius: 8px !important;
+            }
+            .analysis-game-card:hover { background: #252525 !important; border-color: #4a9eff !important; }
+
+            /* Team logos */
             .team-logo {
                 object-fit: contain;
-                filter: brightness(0.95);
-                transition: all 0.2s ease;
-                background: rgba(255, 255, 255, 0.05);
-                border-radius: 3px;
+                background: #1a1a1a;
+                border-radius: 4px;
+                border: 1px solid #2a2a2a;
             }
-            .team-logo:hover {
-                filter: brightness(1.1);
-                transform: scale(1.05);
+            .team-logo[src=""], .team-logo:not([src]) { display: none; }
+
+            /* Refresh button */
+            #refresh_game_button { transition: all 0.15s ease; }
+            #refresh_game_button:hover {
+                background: rgba(74, 158, 255, 0.1) !important;
+                border-color: #4a9eff !important;
+                color: #4a9eff !important;
+                transform: rotate(180deg);
             }
-            /* Hide broken images */
-            .team-logo[src=""], .team-logo:not([src]) {
-                display: none;
+
+            /* Scrollbar */
+            ::-webkit-scrollbar { width: 6px; }
+            ::-webkit-scrollbar-track { background: #1a1a1a; }
+            ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+            ::-webkit-scrollbar-thumb:hover { background: #444; }
+
+            /* Hide number spinners globally */
+            input[type="number"]::-webkit-outer-spin-button,
+            input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+            input[type="number"] { -moz-appearance: textfield; }
+
+            /* Tiny nudge buttons for time/total */
+            .nudge-btn {
+                background: #222 !important;
+                border: 1px solid #333 !important;
+                color: #666 !important;
+                border-radius: 3px !important;
+                font-size: 0.6rem !important;
+                padding: 0 !important;
+                width: 18px !important;
+                height: 14px !important;
+                line-height: 12px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                cursor: pointer !important;
             }
-            
-            /* Game Search Input */
-            #game_search_input.form-control {
-                /* Prevent event bubbling that might close modal */
-                z-index: 1050 !important;
-                position: relative !important;
-            }
-            
-            #game_search_input.form-control:focus {
-                border-color: #4fd1c7 !important;
-                box-shadow: 0 0 0 2px rgba(79, 209, 199, 0.2) !important;
-                z-index: 1051 !important;
-            }
-            
-            #game_search_input.form-control::placeholder {
-                color: #718096 !important;
-                font-style: italic;
-            }
-            
-            /* Prevent modal from closing when clicking in search area */
-            .modal-body {
-                position: relative;
-                z-index: 1040;
+            .nudge-btn:hover { color: #fff !important; border-color: #4a9eff !important; }
+            .nudge-wrap {
+                display: flex;
+                flex-direction: column;
+                gap: 1px;
+                margin-left: 4px;
+                justify-content: center;
             }
         </style>
         <script>
-            // Prevent modal from closing when interacting with search input
             document.addEventListener('DOMContentLoaded', function() {
-                console.log('Setting up search input protection...');
-                
-                // Add event listeners to prevent modal close on search input interaction
-                document.addEventListener('click', function(e) {
-                    if (e.target && (e.target.id === 'game_search_input' || e.target.id === 'clear_search_btn')) {
-                        console.log('Preventing click propagation for search elements');
-                        e.stopPropagation();
-                    }
-                });
-                
+                document.addEventListener('wheel', function(e) {
+                    if (document.activeElement.type === 'number') { e.preventDefault(); }
+                }, { passive: false });
                 document.addEventListener('keydown', function(e) {
-                    if (e.target && e.target.id === 'game_search_input') {
-                        console.log('Preventing keydown propagation for search input');
-                        e.stopPropagation();
-                    }
-                });
-                
-                document.addEventListener('input', function(e) {
-                    if (e.target && e.target.id === 'game_search_input') {
-                        console.log('Search input changed:', e.target.value);
-                        e.stopPropagation();
-                    }
-                });
-                
-                document.addEventListener('focus', function(e) {
-                    if (e.target && e.target.id === 'game_search_input') {
-                        console.log('Search input focused');
-                        e.stopPropagation();
+                    if (e.target.type === 'number' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                        if (document.activeElement !== e.target) { e.preventDefault(); }
                     }
                 });
             });
@@ -409,7 +355,8 @@ app.index_string = '''
 
 PERIOD_TIME_MAPS = {
     40: {'Q (10m)': 10, 'H (20m)': 20, 'FG (40m)': 40},
-    48: {'Q (12m)': 12, 'H (24m)': 24, 'FG (48m)': 48}
+    48: {'Q (12m)': 12, 'H (24m)': 24, 'FG (48m)': 48},
+    'intl': {'Q (10m)': 10, 'H (20m)': 20, 'FG (40m)': 40}
 }
 
 def get_team_logo_url(team_data):
@@ -444,16 +391,22 @@ def get_team_logo_url(team_data):
     
     return ''
 
-def fetch_games_by_date(date_str=None):
-    """Fetch college basketball games from ESPN's internal API for a specific date"""
+def fetch_games_by_date(date_str=None, league='ncaab'):
+    """Fetch basketball games from ESPN for a specific date and league.
+    league: 'ncaab' for college, 'nba' for pro
+    """
     try:
-        if date_str:
-            # Add parameters to get more comprehensive data
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}&limit=300"
+        if not date_str:
+            date_str = datetime.now().strftime('%Y%m%d')
+        
+        if league == 'nba':
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={date_str}"
+            quarter_minutes = 12
+            total_game_minutes = 48
         else:
-            # For "today", use current date regardless of time - college games often span midnight
-            today_str = datetime.now().strftime('%Y%m%d')
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={today_str}&limit=300"
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}&limit=300&groups=50"
+            quarter_minutes = 20  # NCAA uses halves
+            total_game_minutes = 40
         
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -473,18 +426,8 @@ def fetch_games_by_date(date_str=None):
             
             state = status.get('type', {}).get('state', '')
             
-            # Extract team logos from ESPN data
             home_team_data = home_team.get('team', {})
             away_team_data = away_team.get('team', {})
-            
-            # Debug: Print available team data keys (remove after testing)
-            if len(games) == 0:  # Only print for first game to avoid spam
-                print(f"DEBUG: Home team data keys: {list(home_team_data.keys())}")
-                if 'logos' in home_team_data:
-                    print(f"DEBUG: Home team logos: {home_team_data.get('logos')}")
-                if 'logo' in home_team_data:
-                    print(f"DEBUG: Home team logo: {home_team_data.get('logo')}")
-                print(f"DEBUG: Away team data keys: {list(away_team_data.keys())}")
             
             game_info = {
                 'id': event.get('id'),
@@ -498,29 +441,31 @@ def fetch_games_by_date(date_str=None):
                 'away_score': int(away_team.get('score', 0)),
                 'status_text': status.get('type', {}).get('detail', 'Pre-Game'),
                 'period': status.get('period', 1),
-                'clock': status.get('displayClock', '20:00'),
+                'clock': status.get('displayClock', '20:00' if league == 'ncaab' else '12:00'),
                 'is_live': state == 'in',
                 'is_final': state == 'post',
                 'date': event.get('date', ''),
-                'state': state
+                'state': state,
+                'league': league
             }
             
-            # Parse time remaining
+            # Parse time remaining and convert to full-game minutes remaining
             if game_info['is_live']:
                 try:
                     clock = game_info['clock']
                     period = game_info['period']
                     if ':' in clock:
                         mins, secs = clock.split(':')
-                        minutes_left = int(mins)
-                        seconds_left = int(secs.split('.')[0])  # Remove decimals
+                        period_mins_left = int(mins)
+                        seconds_left = int(secs.split('.')[0])
                         
-                        # Automatically convert first half time to full game time remaining
-                        if period == 1:  # First half
-                            original_mins = minutes_left
-                            minutes_left += 20  # Add 20 for entire second half
-                            print(f"DEBUG: First half auto-conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
-                        # If period == 2 (second half) or overtime, leave as is
+                        if league == 'nba':
+                            # NBA: 4 quarters x 12 min. Remaining = clock + (remaining quarters * 12)
+                            remaining_quarters = max(0, 4 - period)
+                            minutes_left = period_mins_left + (remaining_quarters * 12)
+                        else:
+                            # NCAA: 2 halves x 20 min. Add 20 if first half
+                            minutes_left = period_mins_left + (20 if period == 1 else 0)
                         
                         game_info['minutes_left'] = minutes_left
                         game_info['seconds_left'] = seconds_left
@@ -531,27 +476,29 @@ def fetch_games_by_date(date_str=None):
                     game_info['minutes_left'] = 0
                     game_info['seconds_left'] = 0
             else:
-                game_info['minutes_left'] = 20 if state == 'pre' else 0
+                game_info['minutes_left'] = total_game_minutes if state == 'pre' else 0
                 game_info['seconds_left'] = 0
             
             games.append(game_info)
         
         return games
     except Exception as e:
-        print(f"Error fetching games: {e}")
+        print(f"Error fetching {league} games: {e}")
         return []
 
 def fetch_live_games():
     """Fetch current live games - wrapper for backwards compatibility"""
-    games = fetch_games_by_date()
-    # Only return live and pre-game for the fade system
-    return [g for g in games if g['state'] in ['in', 'pre']]
+    ncaab = fetch_games_by_date(league='ncaab')
+    nba = fetch_games_by_date(league='nba')
+    return [g for g in (ncaab + nba) if g['state'] in ['in', 'pre']]
 
-def fetch_team_recent_games(team_id, num_games=10):
+def fetch_team_recent_games(team_id, num_games=10, league='ncaab'):
     """Fetch recent games for a team to calculate averages"""
     try:
-        # ESPN team schedule endpoint
-        url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/{team_id}/schedule"
+        if league == 'nba':
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/schedule"
+        else:
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/{team_id}/schedule"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
@@ -609,13 +556,21 @@ def fetch_team_recent_games(team_id, num_games=10):
 # ===== ODDS API FUNCTIONS =====
 
 def get_basketball_odds(sport_key='basketball_ncaab'):
-    """Get odds for college basketball games"""
+    """Get odds for college basketball games - tracks API usage"""
+    global odds_api_calls_today, odds_api_last_reset
+    
+    # Reset daily counter
+    today = datetime.now().strftime('%Y-%m-%d')
+    if today != odds_api_last_reset:
+        odds_api_calls_today = 0
+        odds_api_last_reset = today
+    
     url = f"{ODDS_BASE_URL}/sports/{sport_key}/odds"
     
     params = {
         'apiKey': ODDS_API_KEY,
-        'regions': 'us',  # US sportsbooks
-        'markets': 'totals',  # Just totals for now (simpler)
+        'regions': 'us',
+        'markets': 'totals',
         'oddsFormat': 'american',
         'dateFormat': 'iso'
     }
@@ -624,12 +579,19 @@ def get_basketball_odds(sport_key='basketball_ncaab'):
         response = requests.get(url, params=params)
         response.raise_for_status()
         
+        # Track usage from response headers
+        remaining = response.headers.get('x-requests-remaining', '?')
+        used = response.headers.get('x-requests-used', '?')
+        odds_api_calls_today += 1
+        
         games = response.json()
-        print(f"📊 Odds API: Found {len(games)} games with betting lines")
+        print(f"📊 Odds API: {len(games)} games | Used: {used} | Remaining: {remaining} | Today's calls: {odds_api_calls_today}")
         return games
         
     except requests.exceptions.RequestException as e:
         print(f"❌ Odds API Error: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"   Response: {e.response.text[:200]}")
         return []
 
 def extract_betting_totals(odds_games):
@@ -672,6 +634,34 @@ def extract_betting_totals(odds_games):
     
     return betting_data
 
+def match_espn_with_odds(espn_games, betting_data):
+    """Match ESPN games with betting lines"""
+    matched_games = []
+    
+    for espn_game in espn_games:
+        home_team = espn_game.get('home_team', '')
+        away_team = espn_game.get('away_team', '')
+        
+        # Try to match with betting data
+        match_key = f"{away_team}|{home_team}"
+        betting_info = betting_data.get(match_key)
+        
+        # Add betting data if found
+        enhanced_game = espn_game.copy()
+        if betting_info:
+            enhanced_game.update({
+                'betting_total': betting_info['avg_total'],
+                'betting_range': betting_info['total_range'],
+                'num_sportsbooks': betting_info['num_books'],
+                'has_betting_line': True
+            })
+        else:
+            enhanced_game['has_betting_line'] = False
+        
+        matched_games.append(enhanced_game)
+    
+    return matched_games
+
 def format_game_option(game):
     """Format game data for dropdown display - clean and professional"""
     def shorten_team_name(name, max_len=12):
@@ -706,9 +696,12 @@ def format_game_option(game):
     home = shorten_team_name(game['home_team'])
     
     if game['is_live']:
+        # Show raw ESPN time - user controls conversion with toggle
+        display_clock = game['clock']
+        
         score = f"{game['away_score']}-{game['home_score']}"
         return {
-            'label': f"{away} {score} {home} • {game['clock']}",
+            'label': f"{away} {score} {home} • {display_clock}",
             'value': game['id']
         }
     else:
@@ -752,29 +745,49 @@ def get_fade_analysis(team1, team2, live_total, min_left, my_bet=None, period_ti
 def score_input(label, input_id):
     return html.Div([
         html.Div(label, className="label"),
-        dbc.InputGroup([
-            dbc.Button("−", id={"type": "dec", "index": input_id}, className="btn-adj px-3"),
-            dbc.Input(id=input_id, type="number", placeholder="0", style={"textAlign": "center"}),
-            dbc.Button("+", id={"type": "inc", "index": input_id}, className="btn-adj px-3"),
-        ], size="sm")
+        html.Div([
+            # Main input field (normal like others)
+            dbc.Input(
+                id=input_id, 
+                type="number", 
+                style={"textAlign": "center", "marginBottom": "0.5rem"}
+            ),
+            # Small +/- buttons below the input
+            html.Div([
+                dbc.Button("−", id={"type": "dec", "index": input_id}, 
+                          className="btn-micro", size="sm"),
+                dbc.Button("+", id={"type": "inc", "index": input_id}, 
+                          className="btn-micro", size="sm"),
+            ], style={
+                "display": "flex", 
+                "gap": "0.25rem", 
+                "justifyContent": "center"
+            })
+        ])
     ], className="mb-3")
 
 
 app.layout = dbc.Container([
-    # Professional Header
+    # Game Reminder (top-left)
     html.Div([
-        html.H2("- CBB Fade Terminal -", 
-                style={"fontWeight": "600", "color": "#f7fafc", "marginBottom": "0.5rem", "letterSpacing": "-0.02em"}),
-    ], className="text-center", style={"padding": "2rem 0 1.5rem 0"}),
+        dbc.Input(
+            id="game_reminder_input",
+            type="text",
+            placeholder="Game reminder...",
+            style={"width": "200px", "fontSize": "0.8rem"}
+        )
+    ], style={"position": "absolute", "top": "12px", "left": "12px", "zIndex": "1000"}),
     
-    # Professional Tabs
+    # Header
+    html.Div([
+        html.H3("CBB Fade Terminal", style={"marginBottom": "0", "fontSize": "1.4rem"}),
+    ], className="text-center", style={"padding": "1.5rem 0 1rem 0"}),
+    
+    # Tabs
     dbc.Tabs([
-        dbc.Tab(label="Live Analysis", tab_id="fade-tab", 
-                style={"fontSize": "0.9rem", "fontWeight": "500"}),
-        dbc.Tab(label="Research", tab_id="analysis-tab",
-                style={"fontSize": "0.9rem", "fontWeight": "500"}),
-    ], id="main-tabs", active_tab="fade-tab", className="mb-4",
-       style={"borderBottom": "1px solid rgba(63, 63, 70, 0.3)"}),
+        dbc.Tab(label="Live Analysis", tab_id="fade-tab"),
+        dbc.Tab(label="Research", tab_id="analysis-tab"),
+    ], id="main-tabs", active_tab="fade-tab", className="mb-3"),
     
     html.Div(id="tab-content"),
     
@@ -782,61 +795,34 @@ app.layout = dbc.Container([
     dcc.Store(id="opening_line", data=None),
     dcc.Store(id="live_games_data", data=[]),
     dcc.Store(id="selected_game_data", data=None),
-    dcc.Store(id="persistent_game_selection", data=None),  # Completely separate storage for game selection
+    dcc.Store(id="persistent_game_selection", data=None),
     dcc.Store(id="today_games_data", data=[]),
     dcc.Store(id="tomorrow_games_data", data=[]),
     dcc.Store(id="week_games_data", data=[]),
     dcc.Store(id="betting_odds_data", data={}),
-    dcc.Interval(id="refresh_games", interval=30*1000, n_intervals=0),  # Refresh every 30 seconds (less frequent to avoid search interference)
+    dcc.Store(id="odds_api_status", data={}),
+    dcc.Store(id="game_reminder_store", data="", storage_type='local'),
+    dcc.Interval(id="refresh_games", interval=30*1000, n_intervals=0),
+    dcc.Interval(id="refresh_odds", interval=5*60*1000, n_intervals=0),
     
     # Game Selection Modal
     dbc.Modal([
         dbc.ModalHeader([
-            html.H4("Select Game", style={"color": "#f7fafc", "margin": "0"}),
-        ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"}),
+            html.H5("Select Game", style={"margin": "0"}),
+        ], style={"background": "#1a1a1a", "borderBottom": "1px solid #2a2a2a"}),
         dbc.ModalBody([
-            # Search bar
-            html.Div([
-                dbc.InputGroup([
-                    dbc.Input(
-                        id="game_search_input",
-                        placeholder="Search teams (e.g., 'Duke', 'Carolina', 'Lakers')...",
-                        type="text",
-                        autoComplete="off",
-                        style={
-                            "background": "rgba(45, 55, 72, 0.9)",
-                            "border": "1px solid rgba(74, 85, 104, 0.5)",
-                            "borderRadius": "8px 0 0 8px",
-                            "color": "#f7fafc",
-                            "fontSize": "0.9rem",
-                            "padding": "0.75rem"
-                        }
-                    ),
-                    dbc.Button(
-                        "✕",
-                        id="clear_search_btn",
-                        color="secondary",
-                        size="sm",
-                        style={
-                            "background": "rgba(74, 85, 104, 0.3)",
-                            "border": "1px solid rgba(74, 85, 104, 0.5)",
-                            "borderRadius": "0 8px 8px 0",
-                            "color": "#a0aec0",
-                            "fontSize": "0.8rem",
-                            "padding": "0.5rem",
-                            "minWidth": "40px"
-                        }
-                    )
-                ], className="mb-3")
-            ]),
-            # Games grid
+            dbc.Input(
+                id="game_search_input",
+                placeholder="Search teams...", 
+                style={"marginBottom": "0.75rem"}
+            ),
             html.Div(id="game_selection_grid", style={"maxHeight": "50vh", "overflowY": "auto"})
-        ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none", "padding": "1.5rem"}),
+        ], style={"background": "#1a1a1a", "padding": "1rem"}),
         dbc.ModalFooter([
-            dbc.Button("Cancel", id="game_modal_close", className="pro-button-secondary", size="sm")
-        ], style={"background": "rgba(26, 32, 44, 0.95)", "border": "none"})
-    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static", keyboard=False)
-], fluid=True, style={"maxWidth": "1400px", "padding": "0 2rem"})
+            dbc.Button("Cancel", id="game_modal_close", className="btn-secondary", size="sm")
+        ], style={"background": "#1a1a1a", "borderTop": "1px solid #2a2a2a"})
+    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static")
+], fluid=True, style={"maxWidth": "1200px", "padding": "0 1.5rem"})
 
 
 def create_fade_tab():
@@ -850,7 +836,8 @@ def create_fade_tab():
                             html.Div("League", className="label"),
                             dcc.Dropdown(id="game_length", options=[
                                 {"label": "NCAA", "value": 40},
-                                {"label": "NBA", "value": 48}
+                                {"label": "NBA", "value": 48},
+                                {"label": "International", "value": "intl"}
                             ], value=40, clearable=False, className="dark-dropdown")
                         ], width=6),
                         dbc.Col([
@@ -862,28 +849,41 @@ def create_fade_tab():
                     html.Div([
                         html.Div([
                             html.Span("Live Game", className="label"),
-                            html.Span(" (ESPN)", style={"fontSize": "0.65rem", "color": "#555", "marginLeft": "6px"})
+                            html.Span(" (ESPN)", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "4px"})
                         ]),
-                        html.Button(
-                            id="game_selector_button",
-                            children=[
-                                html.Div("Select Game", id="game_selector_text", style={"color": "#a0aec0"}),
-                                html.Div("⌄", style={"fontSize": "1.2rem", "marginLeft": "auto"})
-                            ],
-                            className="game-selector-btn",
-                            style={
-                                "width": "100%", 
-                                "display": "flex", 
-                                "alignItems": "center",
-                                "justifyContent": "space-between",
-                                "padding": "0.75rem 1rem",
-                                "background": "rgba(26, 32, 44, 0.9)",
-                                "border": "1px solid rgba(74, 85, 104, 0.4)",
-                                "borderRadius": "8px",
-                                "cursor": "pointer",
-                                "transition": "all 0.2s ease"
-                            }
+                        html.Div([
+                            html.Button(
+                                id="game_selector_button",
+                                children=[
+                                    html.Div("Select Game", id="game_selector_text", style={"color": "#888"}),
+                                    html.Div("⌄", style={"marginLeft": "auto"})
+                                ],
+                                className="game-selector-btn",
+                                style={
+                                    "width": "100%", 
+                                    "display": "flex", 
+                                    "alignItems": "center",
+                                    "justifyContent": "space-between",
+                                    "padding": "0.5rem 0.75rem",
+                                    "cursor": "pointer",
+                                }
                         ),
+                        html.Button(
+                            "↻",
+                            id="refresh_game_button",
+                            className="btn btn-secondary",
+                            style={
+                                "width": "36px",
+                                "height": "36px", 
+                                "marginLeft": "6px",
+                                "fontSize": "1rem",
+                                "display": "flex",
+                                "alignItems": "center",
+                                "justifyContent": "center",
+                            },
+                            title="Refresh live scores and time"
+                        ),
+                        ], style={"display": "flex", "alignItems": "start"}),
                         # Store selected game ID and button text separately for persistence
                         dcc.Store(id="live_game_selector", data=None),
                         dcc.Store(id="selected_game_text", data="Select Game"),
@@ -896,29 +896,58 @@ def create_fade_tab():
                     
                     html.Div([
                         html.Div("Live Total", className="label"),
-                        dbc.Input(id="live_total", type="number", placeholder="-"),
+                        html.Div([
+                            dbc.Input(id="live_total", type="number", style={"flex": "1"}),
+                            html.Div([
+                                html.Button("▲", id="live_total_up", className="nudge-btn", n_clicks=0),
+                                html.Button("▼", id="live_total_down", className="nudge-btn", n_clicks=0),
+                            ], className="nudge-wrap")
+                        ], style={"display": "flex", "alignItems": "center"})
                     ], className="mb-3"),
                     
                     dbc.Row([
                         dbc.Col([
                             html.Div("Minutes", className="label"),
-                            dbc.Input(id="mins_left", type="number", placeholder="-", min=0)
+                            html.Div([
+                                dbc.Input(id="mins_left", type="number", min=0, style={"flex": "1"}),
+                                html.Div([
+                                    html.Button("▲", id="mins_up", className="nudge-btn", n_clicks=0),
+                                    html.Button("▼", id="mins_down", className="nudge-btn", n_clicks=0),
+                                ], className="nudge-wrap")
+                            ], style={"display": "flex", "alignItems": "center"})
                         ], width=6),
                         dbc.Col([
                             html.Div("Seconds", className="label"),
-                            dbc.Input(id="secs_left", type="number", placeholder="-", min=0, max=59)
+                            html.Div([
+                                dbc.Input(id="secs_left", type="number", min=0, max=59, style={"flex": "1"}),
+                                html.Div([
+                                    html.Button("▲", id="secs_up", className="nudge-btn", n_clicks=0),
+                                    html.Button("▼", id="secs_down", className="nudge-btn", n_clicks=0),
+                                ], className="nudge-wrap")
+                            ], style={"display": "flex", "alignItems": "center"})
                         ], width=6),
-                    ], className="mb-4"),
+                    ], className="mb-2"),
+                    
+                    # First Half Toggle
+                    html.Div([
+                        dbc.Checklist(
+                            id="first_half_toggle",
+                            options=[{"label": "First Half (+20 min)", "value": "first_half"}],
+                            value=[],
+                            inline=True,
+                            style={"fontSize": "0.75rem", "color": "#888"}
+                        )
+                    ], className="mb-3", style={"textAlign": "center"}),
                     
                     html.Div([
                         html.Div("Your Under (optional)", className="label"),
-                        dbc.Input(id="my_bet", type="number", placeholder="-"),
+                        dbc.Input(id="my_bet", type="number"),
                     ], className="mb-4"),
                     
                     html.Div([
                         html.Div([
-                            html.Span("Threshold: ", style={"color": "#666", "fontSize": "0.75rem"}),
-                            html.Span(id="thresh_val", style={"color": "#fff", "fontWeight": "600"})
+                            html.Span("Threshold: ", style={"color": "#888", "fontSize": "0.75rem"}),
+                            html.Span(id="thresh_val", style={"color": "#e5e5e5", "fontWeight": "600"})
                         ], className="mb-2"),
                         dcc.Slider(id="threshold_slider", min=2.5, max=6, step=0.25, value=4.0,
                                    marks={2.5: '2.5', 4: '4', 6: '6'})
@@ -936,18 +965,12 @@ def create_fade_tab():
                                 id="live_analysis_games_input",
                                 type="text",
                                 value="5",
-                                placeholder="5",
-                                style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.85rem"}
+                                style={"textAlign": "center", "maxWidth": "60px"}
                             ),
-                            dbc.InputGroupText("games", style={
-                                "background": "rgba(26, 32, 44, 0.8)",
-                                "border": "1px solid rgba(74, 85, 104, 0.4)",
-                                "color": "#a0aec0",
-                                "fontSize": "0.75rem"
-                            })
+                            dbc.InputGroupText("games")
                         ], size="sm")
-                    ], width=3),
-                    dbc.Col(width=9)
+                    ], width=4),
+                    dbc.Col(width=8)
                 ], className="mb-3")
             ], id="analysis_controls", style={"display": "none"}),
             html.Div(id="team_context_display", className="mt-3")  
@@ -980,7 +1003,6 @@ def create_analysis_tab():
                             dcc.Dropdown(
                                 id="team1_selector",
                                 options=[],
-                                placeholder="Select Team 1...",
                                 clearable=True,
                                 searchable=True,
                                 className="dark-dropdown"
@@ -990,7 +1012,6 @@ def create_analysis_tab():
                             dcc.Dropdown(
                                 id="team2_selector", 
                                 options=[],
-                                placeholder="Select Team 2...",
                                 clearable=True,
                                 searchable=True,
                                 className="dark-dropdown"
@@ -1008,22 +1029,16 @@ def create_analysis_tab():
                                     id="games_count_input",
                                     type="text",
                                     value="5",
-                                    placeholder="5",
-                                    style={"textAlign": "center", "fontWeight": "600", "fontSize": "0.9rem"}
+                                    style={"textAlign": "center", "maxWidth": "60px"}
                                 ),
-                                dbc.InputGroupText("games", style={
-                                    "background": "rgba(26, 32, 44, 0.8)",
-                                    "border": "1px solid rgba(74, 85, 104, 0.4)",
-                                    "color": "#a0aec0",
-                                    "fontSize": "0.8rem"
-                                })
+                                dbc.InputGroupText("games")
                             ], size="sm")
-                        ], width=3),
+                        ], width=4),
                         dbc.Col([
                             html.Div([
-                                html.Span("Analysis Based On: ", className="label", style={"display": "inline-block", "marginRight": "8px"}),
-                                html.Span(id="games_count_display", style={"fontSize": "0.85rem", "color": "#68d391", "fontWeight": "600"})
-                            ], style={"marginTop": "1.2rem"})
+                                html.Span("Analysis Based On: ", className="label", style={"display": "inline-block", "marginRight": "6px"}),
+                                html.Span(id="games_count_display", style={"fontSize": "0.8rem", "color": "#4a9eff", "fontWeight": "600"})
+                            ], style={"marginTop": "1rem"})
                         ], width=9),
                     ]),
                 ], className="mb-3"),
@@ -1049,6 +1064,51 @@ def switch_tabs(active_tab):
         return create_analysis_tab()
     return create_fade_tab()
 
+@app.callback(
+    Output("live_total", "value", allow_duplicate=True),
+    Input("live_total_up", "n_clicks"),
+    Input("live_total_down", "n_clicks"),
+    State("live_total", "value"),
+    prevent_initial_call=True
+)
+def nudge_live_total(up, down, val):
+    val = val or 0
+    if ctx.triggered_id == "live_total_up":
+        return val + 0.5
+    elif ctx.triggered_id == "live_total_down":
+        return max(0, val - 0.5)
+    raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output("mins_left", "value", allow_duplicate=True),
+    Input("mins_up", "n_clicks"),
+    Input("mins_down", "n_clicks"),
+    State("mins_left", "value"),
+    prevent_initial_call=True
+)
+def nudge_mins(up, down, val):
+    val = val or 0
+    if ctx.triggered_id == "mins_up":
+        return val + 1
+    elif ctx.triggered_id == "mins_down":
+        return max(0, val - 1)
+    raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output("secs_left", "value", allow_duplicate=True),
+    Input("secs_up", "n_clicks"),
+    Input("secs_down", "n_clicks"),
+    State("secs_left", "value"),
+    prevent_initial_call=True
+)
+def nudge_secs(up, down, val):
+    val = val or 0
+    if ctx.triggered_id == "secs_up":
+        return min(59, val + 1)
+    elif ctx.triggered_id == "secs_down":
+        return max(0, val - 1)
+    raise dash.exceptions.PreventUpdate
+
 @app.callback(Output("thresh_val", "children"), Input("threshold_slider", "value"))
 def show_thresh(v): return f"{v}"
 
@@ -1068,52 +1128,57 @@ def update_periods(gl):
 def adj_scores(inc, dec, t1, t2):
     if not ctx.triggered_id: raise dash.exceptions.PreventUpdate
     t = ctx.triggered_id
-    t1, t2 = t1 or 0, t2 or 0
+    # Don't force "0" to appear - keep inputs clean
+    t1 = t1 if t1 is not None else None
+    t2 = t2 if t2 is not None else None
     d = 1 if t["type"] == "inc" else -1
-    if t["index"] == "team1": t1 = max(0, t1 + d)
-    elif t["index"] == "team2": t2 = max(0, t2 + d)
+    if t["index"] == "team1": 
+        t1 = max(0, (t1 or 0) + d)
+        t1 = None if t1 == 0 else t1  # Don't show 0
+    elif t["index"] == "team2": 
+        t2 = max(0, (t2 or 0) + d)  
+        t2 = None if t2 == 0 else t2  # Don't show 0
     return t1, t2
 
 
 # ESPN API Callbacks
+# ===== ESPN REFRESH (every 30 sec - FREE) =====
 @app.callback(
     Output("live_games_data", "data"),
     Output("today_games_data", "data"),
     Output("tomorrow_games_data", "data"),
     Output("week_games_data", "data"),
-    Output("betting_odds_data", "data"),
     Input("refresh_games", "n_intervals")
 )
-def refresh_all_games(n):
-    """Fetch all games data every interval"""
-    # Expand date ranges for more comprehensive coverage
+def refresh_espn_games(n):
+    """Fetch games from ESPN every 30 sec (FREE - no API limit)"""
     today = datetime.now().strftime('%Y%m%d')
     tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y%m%d')
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
     
-    # Get today's games (including yesterday's late games that might still be live)
-    yesterday_games = fetch_games_by_date(yesterday)
-    today_games = fetch_games_by_date(today)
-    tomorrow_games = fetch_games_by_date(tomorrow)
+    # Fetch both NCAA and NBA for each date window
+    all_live_candidates = []
+    today_games = []
+    tomorrow_games = []
     
-    # Combine all current/live games from multiple days for more options
-    all_current_games = yesterday_games + today_games + tomorrow_games
+    for league in ['ncaab', 'nba']:
+        yg = fetch_games_by_date(yesterday, league=league)
+        tg = fetch_games_by_date(today, league=league)
+        tmg = fetch_games_by_date(tomorrow, league=league)
+        
+        all_live_candidates.extend(yg + tg + tmg)
+        today_games.extend(tg)
+        tomorrow_games.extend(tmg)
     
-    # Also get games from the next few days to include busy game days
-    for days_ahead in range(2, 7):  # Days 2-6 ahead (Tuesday through Saturday)
-        future_date = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
-        future_games = fetch_games_by_date(future_date)
-        all_current_games.extend(future_games)
+    live_games_expanded = [g for g in all_live_candidates if g['state'] in ['in', 'pre']]
     
-    # Show live games + upcoming games from all fetched days (not just today)
-    live_games = [g for g in all_current_games if g['state'] in ['in', 'pre']]
-    
-    # Get extended week's games (next 14 days for more options)
+    # Get week's games (next 10 days for more options)
     week_games = []
-    for days_ahead in range(-1, 14):  # Include yesterday through next 13 days
+    for days_ahead in range(-1, 10):
         date_str = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
-        games = fetch_games_by_date(date_str)
-        week_games.extend(games)
+        for league in ['ncaab', 'nba']:
+            games = fetch_games_by_date(date_str, league=league)
+            week_games.extend(games)
     
     # Remove duplicates based on game ID
     seen_ids = set()
@@ -1123,22 +1188,53 @@ def refresh_all_games(n):
             unique_week_games.append(game)
             seen_ids.add(game['id'])
     
-    # Fetch betting odds
+    ncaab_count = sum(1 for g in unique_week_games if g.get('league') == 'ncaab')
+    nba_count = sum(1 for g in unique_week_games if g.get('league') == 'nba')
+    print(f"🏀 ESPN: {len(live_games_expanded)} live/upcoming | {ncaab_count} NCAAB + {nba_count} NBA = {len(unique_week_games)} total")
+    return live_games_expanded, today_games, tomorrow_games, unique_week_games
+
+
+# ===== ODDS API REFRESH (every 5 min - PAID, ~288 calls/day max) =====
+@app.callback(
+    Output("betting_odds_data", "data"),
+    Output("odds_api_status", "data"),
+    Input("refresh_odds", "n_intervals"),
+)
+def refresh_odds_data(n):
+    """Fetch betting odds every 5 min (PAID - conserves API credits)
+    
+    Budget math at 5-min interval (2 calls per refresh: NCAAB + NBA):
+      24 calls/hr × 12 hrs active use = ~288 calls/day
+      288 × 30 days = ~8,640 calls/month (well under 20k limit)
+    """
     try:
-        odds_games = get_basketball_odds()
-        betting_data = extract_betting_totals(odds_games)
-        print(f"📊 Game Summary:")
-        print(f"   Yesterday: {len(yesterday_games)} games")
-        print(f"   Today: {len(today_games)} games") 
-        print(f"   Tomorrow: {len(tomorrow_games)} games")
-        print(f"   Live/Upcoming: {len(live_games)} games (across all days)")
-        print(f"   Total Week: {len(unique_week_games)} games")
-        print(f"   Betting Lines: {len(betting_data)} matched")
+        ncaab_odds = get_basketball_odds('basketball_ncaab')
+        nba_odds = get_basketball_odds('basketball_nba')
+        
+        betting_data = extract_betting_totals(ncaab_odds)
+        nba_betting = extract_betting_totals(nba_odds)
+        betting_data.update(nba_betting)
+        
+        status = {
+            "remaining": "?",
+            "used": "?",
+            "last_refresh": datetime.now().strftime('%I:%M %p'),
+            "matched_games": len(betting_data),
+            "calls_today": odds_api_calls_today
+        }
+        
+        print(f"💰 Odds API: Matched {len(betting_data)} games with betting lines (NCAAB + NBA)")
+        return betting_data, status
     except Exception as e:
         print(f"❌ Error fetching odds: {e}")
-        betting_data = {}
-    
-    return live_games, today_games, tomorrow_games, unique_week_games, betting_data
+        status = {
+            "remaining": "?",
+            "used": "?", 
+            "last_refresh": f"Error at {datetime.now().strftime('%I:%M %p')}",
+            "matched_games": 0,
+            "calls_today": odds_api_calls_today
+        }
+        return {}, status
 
 # Modal Callbacks
 @app.callback(
@@ -1156,76 +1252,64 @@ def toggle_game_modal(open_clicks, close_clicks, game_clicks, is_open, active_ta
         # Only process if we're on the fade tab (where the button exists)
         if active_tab != "fade-tab":
             return False
-        
-        # Get the component that triggered this callback
-        triggered_id = ctx.triggered_id
-        print(f"DEBUG: Modal callback triggered by: {triggered_id}")
             
         # Only open when button is explicitly clicked
-        if triggered_id == "game_selector_button" and open_clicks:
-            print("DEBUG: Opening modal")
+        if ctx.triggered_id == "game_selector_button" and open_clicks:
             return True
-        # Close when cancel clicked
-        elif triggered_id == "game_modal_close" and close_clicks:
-            print("DEBUG: Closing modal - cancel button")
+        # Close when cancel clicked or any game card clicked
+        elif ctx.triggered_id == "game_modal_close" or (game_clicks and any(game_clicks)):
             return False
-        # Close when game card clicked
-        elif triggered_id and "game-card" in str(triggered_id) and game_clicks and any(game_clicks):
-            print("DEBUG: Closing modal - game selected")
-            return False
-        # Stay in current state for any other triggers
-        else:
-            print(f"DEBUG: Keeping modal state: {is_open}")
-            return is_open
-    except Exception as e:
-        print(f"DEBUG: Modal callback error: {e}")
-        # Graceful fallback - maintain current state
-        return is_open if is_open is not None else False
+        # Default to closed state
+        return False
+    except Exception:
+        # Graceful fallback for any callback issues
+        return False
 
 @app.callback(
-    Output("game_search_input", "value", allow_duplicate=True),
-    Input("clear_search_btn", "n_clicks"),
+    Output("game_search_input", "value"),
+    Input("game_selection_modal", "is_open"),
     prevent_initial_call=True
 )
-def clear_search_input(n_clicks):
-    """Clear search input when X button is clicked"""
-    if n_clicks:
-        return ""
-    raise dash.exceptions.PreventUpdate
+def clear_search_on_modal_open(is_open):
+    """Clear search input when modal opens"""
+    if is_open:
+        return ""  # Clear the search when modal opens
+    return dash.no_update
 
 @app.callback(
     Output("game_selection_grid", "children"),
-    Input("live_games_data", "data"),
-    Input("game_search_input", "value")
+    [Input("live_games_data", "data"),
+     Input("game_search_input", "value")]
 )
 def populate_game_modal(games_data, search_term):
-    """Populate modal with game cards (with search filtering)"""
-    print(f"DEBUG: populate_game_modal called with search_term: '{search_term}', games: {len(games_data) if games_data else 0}")
-    
+    """Populate modal with game cards, filtered by search term"""
     if not games_data:
-        return html.Div("No games available", style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
+        return html.Div("No games available", style={"color": "#888", "textAlign": "center", "padding": "2rem"})
     
     # Filter games based on search term
     filtered_games = games_data
-    if search_term and len(search_term.strip()) > 0:
-        search_lower = search_term.lower().strip()
+    if search_term and search_term.strip():
+        search_lower = search_term.strip().lower()
         filtered_games = []
         for game in games_data:
-            # Search in team names
-            if (search_lower in game.get('home_team', '').lower() or 
-                search_lower in game.get('away_team', '').lower()):
+            home_team = game.get('home_team', '').lower()
+            away_team = game.get('away_team', '').lower()
+            if search_lower in home_team or search_lower in away_team:
                 filtered_games.append(game)
     
     if not filtered_games:
-        search_msg = f"No games found for '{search_term}'" if search_term else "No games available"
-        return html.Div(search_msg, style={"color": "#a0aec0", "textAlign": "center", "padding": "2rem"})
+        return html.Div(f"No games found matching '{search_term}'", 
+                       style={"color": "#888", "textAlign": "center", "padding": "2rem"})
     
     game_cards = []
     for i, game in enumerate(filtered_games):
         if game['is_live']:
+            # Show raw ESPN time - user controls conversion with toggle
+            display_clock = game['clock']
+            
             time_display = html.Div([
                 html.Span("LIVE", className="live-indicator"),
-                html.Span(f" • {game['clock']}", style={"color": "#a0aec0", "fontSize": "0.8rem"})
+                html.Span(f" • {display_clock}", style={"color": "#888", "fontSize": "0.8rem"})
             ], className="game-time")
             details = f"{game['away_score']}-{game['home_score']} • Total: {game['away_score'] + game['home_score']}"
         else:
@@ -1240,10 +1324,18 @@ def populate_game_modal(games_data, search_term):
             time_display = html.Div(time_str, className="game-time")
             details = "Upcoming"
         
+        league_label = game.get('league', 'ncaab').upper()
+        league_color = "#f59e0b" if league_label == 'NBA' else "#60a5fa"
+        league_badge = html.Span(league_label, style={
+            "fontSize": "0.6rem", "fontWeight": "700", "color": league_color,
+            "border": f"1px solid {league_color}", "borderRadius": "3px",
+            "padding": "1px 4px", "marginRight": "6px", "verticalAlign": "middle"
+        })
+        
         card = html.Div([
             time_display,
             html.Div([
-                # Away team with logo
+                league_badge,
                 html.Span([
                     html.Img(src=game.get('away_team_logo', ''), 
                             style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "3px", "verticalAlign": "middle"},
@@ -1253,7 +1345,6 @@ def populate_game_modal(games_data, search_term):
                 
                 html.Span(" @ ", style={"margin": "0 8px", "color": "#666"}),
                 
-                # Home team with logo  
                 html.Span([
                     html.Img(src=game.get('home_team_logo', ''), 
                             style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "3px", "verticalAlign": "middle"},
@@ -1272,12 +1363,11 @@ def populate_game_modal(games_data, search_term):
     [Output("live_game_selector", "data"),
      Output("selected_game_text", "data")],
     [Input({"type": "game-card", "index": ALL}, "n_clicks")],
-    [State("live_games_data", "data"),
-     State("game_search_input", "value")],
+    [State("live_games_data", "data")],
     prevent_initial_call=True
 )
-def select_game_from_modal(game_clicks, games_data, search_term):
-    """Handle game selection from modal (with search filtering)"""
+def select_game_from_modal(game_clicks, games_data):
+    """Handle game selection from modal"""
     print(f"DEBUG: select_game_from_modal called with clicks: {game_clicks}, games_data length: {len(games_data) if games_data else 0}")
     
     # Don't reset if no clicks - this was causing the reset!
@@ -1289,16 +1379,6 @@ def select_game_from_modal(game_clicks, games_data, search_term):
         print("DEBUG: No games data - preventing update")
         raise dash.exceptions.PreventUpdate
     
-    # Apply same filtering logic as populate_game_modal
-    filtered_games = games_data
-    if search_term and len(search_term.strip()) > 0:
-        search_lower = search_term.lower().strip()
-        filtered_games = []
-        for game in games_data:
-            if (search_lower in game.get('home_team', '').lower() or 
-                search_lower in game.get('away_team', '').lower()):
-                filtered_games.append(game)
-    
     # Find which game was clicked (look for the highest click count)
     clicked_index = None
     max_clicks = 0
@@ -1307,14 +1387,14 @@ def select_game_from_modal(game_clicks, games_data, search_term):
             max_clicks = clicks
             clicked_index = i
     
-    if clicked_index is not None and clicked_index < len(filtered_games):
-        selected_game = filtered_games[clicked_index]
+    if clicked_index is not None and clicked_index < len(games_data):
+        selected_game = games_data[clicked_index]
         
-        # Create display text with live score if available
+        league_tag = selected_game.get('league', 'ncaab').upper()
         if selected_game.get('is_live'):
-            game_text = f"{selected_game['away_team']} {selected_game['away_score']}-{selected_game['home_score']} {selected_game['home_team']}"
+            game_text = f"[{league_tag}] {selected_game['away_team']} {selected_game['away_score']}-{selected_game['home_score']} {selected_game['home_team']}"
         else:
-            game_text = f"{selected_game['away_team']} @ {selected_game['home_team']}"
+            game_text = f"[{league_tag}] {selected_game['away_team']} @ {selected_game['home_team']}"
         
         # Truncate if too long
         if len(game_text) > 40:
@@ -1364,54 +1444,182 @@ def store_selected_game(game_id, games_data):
 @app.callback(
     Output("team1", "value", allow_duplicate=True),
     Output("team2", "value", allow_duplicate=True), 
+    Output("live_total", "value", allow_duplicate=True),
     Output("mins_left", "value", allow_duplicate=True),
     Output("secs_left", "value", allow_duplicate=True),
+    Output("game_length", "value", allow_duplicate=True),
     Input("selected_game_data", "data"),
+    State("betting_odds_data", "data"),
     prevent_initial_call=True
 )
-def auto_fill_from_game(game_data):
-    """Auto-fill scores and time from selected game (but NOT live total)"""
+def auto_fill_from_game(game_data, betting_odds_data):
+    """Auto-fill scores, time, league, and live total from selected game"""
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
-    # Extract scores from ESPN data structure
-    home_score = game_data.get('home_score', 0)
-    away_score = game_data.get('away_score', 0)
+    home_score = int(game_data.get('home_score', 0) or 0)
+    away_score = int(game_data.get('away_score', 0) or 0)
     
-    # Parse time from clock (e.g., "12:34" or "12:34.5")
+    if home_score == 0 and not game_data.get('is_live'):
+        home_score = None
+    if away_score == 0 and not game_data.get('is_live'):
+        away_score = None
+    
+    # Auto-select league based on game
+    league = game_data.get('league', 'ncaab')
+    game_length = 48 if league == 'nba' else 40
+    
     minutes_left = 0
     seconds_left = 0
     
-    if game_data.get('is_live') and game_data.get('clock'):
+    clock = game_data.get('clock', '0:00')
+    period = game_data.get('period', 2)
+    is_live = game_data.get('is_live', False)
+    
+    if is_live and clock:
         try:
-            clock = game_data.get('clock', '0:00')
-            period = game_data.get('period', 2)  # Default to 2nd half if unknown
-            
             if ':' in clock:
                 time_parts = clock.split(':')
                 minutes_left = int(time_parts[0])
-                # Handle seconds with decimals
-                seconds_part = time_parts[1].split('.')[0]  # Remove decimal part
+                seconds_part = time_parts[1].split('.')[0]
                 seconds_left = int(seconds_part)
                 
-                # Automatically convert first half time to full game time remaining
-                if period == 1:  # First half - add 20 minutes for entire second half
-                    original_mins = minutes_left
-                    minutes_left += 20
-                    print(f"DEBUG: First half auto-fill conversion - ESPN: {original_mins}:{seconds_left:02d} → Full game: {minutes_left}:{seconds_left:02d}")
-                # If period == 2 (second half), leave as is
+                if league == 'nba':
+                    remaining_quarters = max(0, 4 - period)
+                    minutes_left += remaining_quarters * 12
+                else:
+                    if period == 1:
+                        minutes_left += 20
         except (ValueError, IndexError):
             minutes_left = 0
             seconds_left = 0
     
-    print(f"DEBUG: Auto-filling - home:{home_score}, away:{away_score}, mins:{minutes_left}, secs:{seconds_left} (live total left blank for manual entry)")
+    # Get betting odds total for live_total - ONLY if betting line exists
+    live_total = None
+    if betting_odds_data and game_data:
+        away_team_name = game_data.get('away_team', '')
+        home_team_name = game_data.get('home_team', '')
+        
+        match_key1 = f"{away_team_name}|{home_team_name}"
+        match_key2 = f"{home_team_name}|{away_team_name}"
+        
+        betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
+        if betting_info:
+            live_total = betting_info.get('avg_total')
+            if live_total:
+                print(f"DEBUG: ✅ Found betting total: {live_total}")
+    
+    # Leave live_total as None if no betting line found
+    if live_total is None:
+        print(f"DEBUG: No betting line found - leaving Live Total empty")
+    
+    print(f"DEBUG: Auto-filling - away:{away_score}, home:{home_score}, total:{live_total}, time:{minutes_left}:{seconds_left:02d}")
     
     return (
-        home_score,
         away_score,
+        home_score,
+        live_total,
         minutes_left,
-        seconds_left
+        seconds_left,
+        game_length
     )
+
+@app.callback(
+    [Output("team1", "value", allow_duplicate=True),
+     Output("team2", "value", allow_duplicate=True),
+     Output("mins_left", "value", allow_duplicate=True),
+     Output("secs_left", "value", allow_duplicate=True)],
+    Input("refresh_game_button", "n_clicks"),
+    [State("persistent_game_selection", "data"),
+     State("live_games_data", "data")],
+    prevent_initial_call=True
+)
+def refresh_game_data(n_clicks, selected_game_data, games_data):
+    """Refresh only the scores and time from ESPN without changing other inputs"""
+    if not n_clicks or not selected_game_data:
+        raise dash.exceptions.PreventUpdate
+    
+    # Get the selected game ID
+    game_id = selected_game_data.get('id')
+    if not game_id:
+        raise dash.exceptions.PreventUpdate
+    
+    try:
+        # Fetch fresh data from ESPN for this specific game
+        fresh_games = fetch_live_games()  # Gets current live games
+        
+        # Find our specific game in the fresh data
+        fresh_game_data = None
+        for game in fresh_games:
+            if str(game.get('id')) == str(game_id):
+                fresh_game_data = game
+                break
+        
+        if not fresh_game_data:
+            print(f"DEBUG: Could not find game {game_id} in fresh ESPN data")
+            raise dash.exceptions.PreventUpdate
+        
+        # Extract fresh scores and time
+        home_score = fresh_game_data.get('home_score')
+        away_score = fresh_game_data.get('away_score')
+        
+        # Handle time parsing with first/second half conversion
+        minutes_left = None
+        seconds_left = None
+        
+        if fresh_game_data.get('is_live') and fresh_game_data.get('clock'):
+            try:
+                clock = fresh_game_data.get('clock', '0:00')
+                period = fresh_game_data.get('period', 2)
+                
+                if ':' in clock:
+                    time_parts = clock.split(':')
+                    minutes_left = int(time_parts[0])
+                    seconds_part = time_parts[1].split('.')[0]  # Remove decimal part
+                    seconds_left = int(seconds_part)
+                    
+                    # No automatic conversion - user controls via First Half toggle
+            except (ValueError, IndexError):
+                minutes_left = None
+                seconds_left = None
+        
+        print(f"DEBUG: Refreshed scores - Home: {home_score}, Away: {away_score}, Time: {minutes_left}:{seconds_left:02d}")
+        
+        return (
+            home_score if home_score is not None else dash.no_update,
+            away_score if away_score is not None else dash.no_update, 
+            minutes_left if minutes_left is not None else dash.no_update,
+            seconds_left if seconds_left is not None else dash.no_update
+        )
+        
+    except Exception as e:
+        print(f"DEBUG: Error refreshing game data: {e}")
+        raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output("mins_left", "value", allow_duplicate=True),
+    Input("first_half_toggle", "value"),
+    State("mins_left", "value"),
+    prevent_initial_call=True
+)
+def handle_first_half_toggle(toggle_value, current_mins):
+    """Handle first half toggle - add/subtract 20 minutes"""
+    if current_mins is None:
+        current_mins = 0
+    
+    is_first_half_checked = "first_half" in (toggle_value or [])
+    
+    # Determine if we should add or subtract 20
+    if is_first_half_checked:
+        # Toggle was just checked - add 20 minutes
+        new_mins = current_mins + 20
+        print(f"DEBUG: First Half toggle CHECKED - Adding 20: {current_mins} → {new_mins}")
+    else:
+        # Toggle was just unchecked - subtract 20 minutes (but not below 0)
+        new_mins = max(0, current_mins - 20)
+        print(f"DEBUG: First Half toggle UNCHECKED - Subtracting 20: {current_mins} → {new_mins}")
+    
+    return new_mins
 
 @app.callback(
     Output("output", "children"),
@@ -1420,36 +1628,35 @@ def auto_fill_from_game(game_data):
     Input("period_type", "value"), Input("threshold_slider", "value")
 )
 def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
-    mins = mins or 0
-    secs = secs or 0
-    min_left = mins + secs / 60
+    # Handle None values for calculation without forcing UI display
+    mins_calc = mins if mins is not None else 0
+    secs_calc = secs if secs is not None else 0
+    min_left = mins_calc + secs_calc / 60
     
     if None in [t1, t2, live_total, period] or min_left <= 0:
         return html.Div([
             html.Div([
-                html.Span("Awaiting input", style={"color": "#4a4a5a", "fontSize": "0.9rem", "letterSpacing": "1px"})
+                html.Span("Awaiting input", style={"color": "#555", "fontSize": "0.85rem"})
             ], className="text-center py-5")
-        ], className="output-card", style={"minHeight": "500px", "display": "flex", 
+        ], className="output-card", style={"minHeight": "400px", "display": "flex", 
                                            "alignItems": "center", "justifyContent": "center"})
     
     r = get_fade_analysis(t1, t2, live_total, min_left, my_bet, period, threshold)
     pct = r['pct']
-    over_thresh = r['required_pace'] > r['threshold']
+    over_thresh = r['required_pace'] >= r['threshold']
     curr = r['actual_pace']
     req = r['required_pace']
     
-    # Signal logic - Fixed to be less restrictive for Under signals
+    # Signal logic
     if pct >= 25 and over_thresh:
         signal, signal_color, border_color = "Under", "#4ade80", "#4ade8044"
-    elif pct >= 5 and over_thresh:  # Lowered from 10 to 5
+    elif pct >= 10 and over_thresh:
         signal, signal_color, border_color = "Under", "#86efac", "#86efac33"
-    elif pct >= 0 and over_thresh:  # NEW: Show Under for any positive % when over threshold
-        signal, signal_color, border_color = "Under", "#a7f3d0", "#a7f3d033"
-    elif not over_thresh:  # Required pace below threshold - Hold
-        signal, signal_color, border_color = "Hold", "#71717a", "#71717a33"
-    elif pct >= -15:  # Negative percentage but not too bad - Hold
+    elif pct >= 0 or not over_thresh:
+        signal, signal_color, border_color = "Hold", "#888888", "#88888833"
+    elif pct >= -15:
         signal, signal_color, border_color = "Hold", "#fbbf24", "#fbbf2433"
-    else:  # Very negative percentage - Pass
+    else:
         signal, signal_color, border_color = "Pass", "#f87171", "#f8717133"
 
     # Pace visualization - line chart
@@ -1469,7 +1676,7 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
         fillcolor=fill_rgba,
         line=dict(color=signal_color, width=3),
         mode='lines+markers+text',
-        marker=dict(size=[12, 14], color=['#71717a', signal_color], line=dict(color='#27272a', width=2)),
+        marker=dict(size=[10, 12], color=['#666', signal_color], line=dict(color='#222', width=2)),
         text=[f'{curr}', f'{req}'],
         textposition=['top center', 'top center'],
         textfont=dict(family='Inter', size=14, color='#e4e4e7'),
@@ -1489,13 +1696,13 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
     
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='#18181b',
-        height=160,
-        margin=dict(l=40, r=20, t=25, b=35),
-        xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(family='Inter', size=11, color='#71717a'), fixedrange=True),
-        yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#27272a', zeroline=False, 
-                   tickfont=dict(family='Inter', size=10, color='#52525b'),
-                   title=dict(text='pts/min', font=dict(size=10, color='#52525b')), fixedrange=True),
+        plot_bgcolor='#161616',
+        height=150,
+        margin=dict(l=40, r=20, t=20, b=30),
+        xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(family='Inter', size=11, color='#666'), fixedrange=True),
+        yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#222', zeroline=False, 
+                   tickfont=dict(family='Inter', size=10, color='#555'),
+                   title=dict(text='pts/min', font=dict(size=10, color='#555')), fixedrange=True),
         showlegend=False
     )
 
@@ -1529,59 +1736,49 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
         ], className="mt-3")
 
     return html.Div([
+        html.Div([
+            # Signal Header
             html.Div([
-            # Professional Signal Header
-                html.Div([
-                html.Div([
-                    html.H3(signal, style={"fontSize": "1.8rem", "fontWeight": "700", "color": signal_color, "margin": "0", "lineHeight": "1"}),
-                    html.P(f"U{r['live_total']}" if pct >= 10 and over_thresh else "Monitor", 
-                           style={"fontSize": "0.9rem", "color": "#a1a1aa", "margin": "0.5rem 0 0 0", "fontWeight": "500"})
-                ])
+                html.H3(signal, style={"fontSize": "1.6rem", "fontWeight": "700", "color": signal_color, "margin": "0"}),
+                html.P(f"U{r['live_total']}" if pct >= 10 and over_thresh else "Monitor", 
+                       style={"fontSize": "0.85rem", "color": "#888", "margin": "0.3rem 0 0 0"})
             ], style={
                 "textAlign": "center",
-                "padding": "1.5rem",
-                "marginBottom": "1.5rem",
-                "borderRadius": "16px",
-                "background": f"linear-gradient(135deg, {signal_color}15, {signal_color}08)",
-                "border": f"1px solid {signal_color}30"
+                "padding": "1.2rem",
+                "marginBottom": "1.2rem",
+                "borderRadius": "8px",
+                "background": "#1e1e1e",
+                "border": f"1px solid {signal_color}40"
             }),
             
-            # Clean Metrics Grid
+            # Metrics Grid
             dbc.Row([
                 dbc.Col([
-                    html.Div([
-                        html.Div("Current Score", className="metric-label"),
-                        html.Div(f"{r['total']}", style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#f4f4f5", "lineHeight": "1"})
-                    ])
+                    html.Div("Current Score", className="metric-label"),
+                    html.Div(f"{r['total']}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#e5e5e5"})
                 ], className="text-center", width=3),
                 dbc.Col([
-                    html.Div([
-                        html.Div("Points Needed", className="metric-label"),
-                        html.Div(f"{r['needed']}", style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
-                    ])
+                    html.Div("Points Needed", className="metric-label"),
+                    html.Div(f"{r['needed']}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
                 ], className="text-center", width=3),
                 dbc.Col([
-                    html.Div([
-                        html.Div("Current Pace", className="metric-label"),
-                        html.Div(f"{curr:.1f}", style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"})
-                    ])
+                    html.Div("Current Pace", className="metric-label"),
+                    html.Div(f"{curr:.1f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#60a5fa"})
                 ], className="text-center", width=3),
                 dbc.Col([
-                    html.Div([
-                        html.Div("Required Pace", className="metric-label"),
-                        html.Div(f"{req:.1f}", style={"fontSize": "1.6rem", "fontWeight": "700", "color": signal_color, "lineHeight": "1"})
-                    ])
+                    html.Div("Required Pace", className="metric-label"),
+                    html.Div(f"{req:.1f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": signal_color})
                 ], className="text-center", width=3),
-            ], className="mb-4"),
+            ], className="mb-3"),
             
             # Time
             html.Div([
-                html.Span(f"{r['elapsed']}m elapsed", style={"color": "#5a5a6a"}),
-                html.Span(" · ", style={"color": "#3a3a4a"}),
-                html.Span(f"{r['remaining']}m remaining", style={"color": "#5a5a6a"})
+                html.Span(f"{r['elapsed']}m elapsed", style={"color": "#666"}),
+                html.Span(" · ", style={"color": "#444"}),
+                html.Span(f"{r['remaining']}m remaining", style={"color": "#666"})
             ], className="text-center mb-3", style={"fontSize": "0.8rem"}),
             
-            # Pace comparison chart
+            # Pace chart
             dcc.Graph(figure=fig, config={'displayModeBar': False, 'staticPlot': True}),
             
             # Position tracker
@@ -1630,43 +1827,49 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                 html.Div([
                     html.H5("Matchup Selected", style={"color": "#e2e8f0", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
                     html.P(f"{away_team_name or 'Away Team'} @ {home_team_name or 'Home Team'}", 
-                           style={"color": "#a0aec0", "fontSize": "0.9rem", "margin": "0.5rem 0"}),
+                           style={"color": "#888", "fontSize": "0.9rem", "margin": "0.5rem 0"}),
                     html.P("Historical analysis requires ESPN team data", 
-                           style={"color": "#718096", "fontSize": "0.8rem", "margin": "1rem 0 0 0"})
+                           style={"color": "#666", "fontSize": "0.8rem", "margin": "1rem 0 0 0"})
                 ], className="pro-card")
             ]), {"display": "block"}
         
         # Get team stats with error handling using dynamic games count
-        home_stats = get_team_stats(home_team_id, games_count)
-        away_stats = get_team_stats(away_team_id, games_count)
+        league = selected_game_data.get('league', 'ncaab')
+        home_stats = get_team_stats(home_team_id, games_count, league=league)
+        away_stats = get_team_stats(away_team_id, games_count, league=league)
         
         if not home_stats or not away_stats:
             return html.Div([
                 html.Div([
-                    html.H5("Team Analysis", style={"color": "#f4f4f5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
-                    html.P(f"{away_team_name} @ {home_team_name}", style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0.5rem 0"}),
-                    html.P("Historical data unavailable", style={"color": "#71717a", "fontSize": "0.85rem", "margin": "1rem 0 0 0"})
+                    html.H5("Team Analysis", style={"color": "#e5e5e5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
+                    html.P(f"{away_team_name} @ {home_team_name}", style={"color": "#999", "fontSize": "0.9rem", "margin": "0.5rem 0"}),
+                    html.P("Historical data unavailable", style={"color": "#666", "fontSize": "0.85rem", "margin": "1rem 0 0 0"})
                 ], className="pro-card")
             ]), {"display": "block"}
         
         # Calculate implied total
+        game_minutes = 48 if league == 'nba' else 40
         implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
-        implied_total_per_min = implied_total / 40
+        implied_total_per_min = implied_total / game_minutes
         
         # Get betting line for this matchup
         betting_info = None
         if betting_odds_data:
             # Try to match with betting data using team names
-            match_key1 = f"{away_team_name}|{home_team_name}"
-            match_key2 = f"{home_team_name}|{away_team_name}"
-            betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
+            match_key = f"{away_team_name}|{home_team_name}"
+            betting_info = betting_odds_data.get(match_key)
+            
+            # Try reverse if not found
+            if not betting_info:
+                reverse_key = f"{home_team_name}|{away_team_name}"
+                betting_info = betting_odds_data.get(reverse_key)
         
         return html.Div([
         html.Div([
             # Clean Header with Team Logos
             html.Div([
                 html.H5("Matchup Intelligence", 
-                       style={"color": "#f4f4f5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
+                       style={"color": "#e5e5e5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
                 html.Div([
                     html.Img(src=selected_game_data.get('away_team_logo', ''), 
                             style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "2px"},
@@ -1693,17 +1896,15 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                         html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
                         html.Div(f"{betting_info['avg_total']:.1f}" if betting_info else "No Line", 
                                 style={"fontSize": "1.6rem", "fontWeight": "700", 
-                                      "color": "#10d9c4" if betting_info else "#71717a", "lineHeight": "1"})
+                                      "color": "#4a9eff" if betting_info else "#666", "lineHeight": "1"})
                     ])
                 ], className="text-center", width=4),
                 dbc.Col([
                     html.Div([
-                        html.Div("Line pts/min" if betting_info else "Avg Scoring", className="metric-label"),
+                        html.Div("Avg Scoring", className="metric-label"),
                         html.Div(
-                            f"{(betting_info['avg_total'] / 40):.2f}" if betting_info 
-                            else f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}",
-                            style={"fontSize": "1.6rem" if betting_info else "1.2rem", "fontWeight": "700" if betting_info else "600", 
-                                   "color": "#10d9c4" if betting_info else "#d4d4d8", "lineHeight": "1"})
+                            f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}",
+                            style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#d4d4d8", "lineHeight": "1"})
                     ])
                 ], className="text-center", width=4),
             ], className="mb-4"),
@@ -1724,30 +1925,30 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                             ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
                             html.Div(f"{away_stats['avg_team_score']:.1f}", 
                                     style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.5rem"}),
+                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#666", "marginBottom": "0.5rem"}),
                             
                             html.Div([
                                 html.Span(f"{away_stats['avg_points_per_minute']:.2f}", 
                                          style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
-                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#71717a", "marginLeft": "2px"})
+                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "2px"})
                             ], className="mb-2"),
                             
                             html.Div([
-                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
+                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#999"}),
                                 html.Span(f"{away_stats['avg_opp_score']:.1f}", 
                                          style={"fontSize": "0.75rem", "color": "#f87171", "fontWeight": "500"})
                             ], className="mb-1"),
                             
                             html.Div([
-                                html.Span("Road: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
+                                html.Span("Road: ", style={"fontSize": "0.75rem", "color": "#999"}),
                                 html.Span(f"{away_stats['away_avg']:.1f}" if away_stats['away_games'] > 0 else "N/A", 
                                          style={"fontSize": "0.75rem", "color": "#d4d4d8", "fontWeight": "500"})
                             ])
                         ])
                     ], style={
-                        "background": "rgba(96, 165, 250, 0.05)",
-                        "border": "1px solid rgba(96, 165, 250, 0.2)",
-                        "borderRadius": "12px",
+                        "background": "#1e1e1e",
+                        "border": "1px solid #2a2a2a",
+                        "borderRadius": "8px",
                         "padding": "1rem"
                     })
                 ], width=5),
@@ -1758,7 +1959,7 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                             style={
                                 "textAlign": "center", 
                                 "fontSize": "0.8rem", 
-                                "color": "#71717a", 
+                                "color": "#666", 
                                 "fontWeight": "600",
                                 "paddingTop": "2rem"
                             })
@@ -1778,30 +1979,30 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                             ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
                             html.Div(f"{home_stats['avg_team_score']:.1f}", 
                                     style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#34d399", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#71717a", "marginBottom": "0.5rem"}),
+                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#666", "marginBottom": "0.5rem"}),
                             
                             html.Div([
                                 html.Span(f"{home_stats['avg_points_per_minute']:.2f}", 
                                          style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
-                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#71717a", "marginLeft": "2px"})
+                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "2px"})
                             ], className="mb-2"),
                             
                             html.Div([
-                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
+                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#999"}),
                                 html.Span(f"{home_stats['avg_opp_score']:.1f}", 
                                          style={"fontSize": "0.75rem", "color": "#f87171", "fontWeight": "500"})
                             ], className="mb-1"),
                             
                             html.Div([
-                                html.Span("Home: ", style={"fontSize": "0.75rem", "color": "#a1a1aa"}),
+                                html.Span("Home: ", style={"fontSize": "0.75rem", "color": "#999"}),
                                 html.Span(f"{home_stats['home_avg']:.1f}" if home_stats['home_games'] > 0 else "N/A", 
                                          style={"fontSize": "0.75rem", "color": "#d4d4d8", "fontWeight": "500"})
                             ])
                         ])
                     ], style={
-                        "background": "rgba(52, 211, 153, 0.05)",
-                        "border": "1px solid rgba(52, 211, 153, 0.2)",
-                        "borderRadius": "12px",
+                        "background": "#1e1e1e",
+                        "border": "1px solid #2a2a2a",
+                        "borderRadius": "8px",
                         "padding": "1rem"
                     })
                 ], width=5),
@@ -1814,7 +2015,7 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
         return html.Div([
             html.Div([
                 html.H5("Analysis Error", style={"color": "#f87171", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0"}),
-                html.P("Unable to load team analysis", style={"color": "#a1a1aa", "fontSize": "0.9rem", "margin": "0.5rem 0 0 0"})
+                html.P("Unable to load team analysis", style={"color": "#999", "fontSize": "0.9rem", "margin": "0.5rem 0 0 0"})
             ], className="pro-card")
         ]), {"display": "block"}
 
@@ -1823,9 +2024,6 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
     Output("games-display", "children"),
     Output("team1_selector", "options"),
     Output("team2_selector", "options"),
-    Output("today-btn", "color"),
-    Output("tomorrow-btn", "color"),
-    Output("week-btn", "color"),
     Input("today-btn", "n_clicks"),
     Input("tomorrow-btn", "n_clicks"),
     Input("week-btn", "n_clicks"),
@@ -1837,23 +2035,23 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
     prevent_initial_call=True
 )
 def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab, today_games, tomorrow_games, week_games, betting_odds_data):
-    """Update games display and button states based on selection or auto-load Today when tab opens"""
+    """Update games display based on button selection or auto-load Today when tab opens"""
     ctx_triggered = ctx.triggered[0]['prop_id'] if ctx.triggered else ''
     
-    # Determine which button should be selected and what data to show
-    if 'tomorrow-btn' in ctx_triggered:
+    # Auto-load Today's games when Research tab is opened
+    if 'main-tabs' in ctx_triggered and active_tab == "analysis-tab":
+        games_to_show = today_games or []
+        title = "Today's Games"
+    # Handle button clicks
+    elif 'tomorrow-btn' in ctx_triggered:
         games_to_show = tomorrow_games or []
         title = "Tomorrow's Games"
-        button_colors = ("secondary", "primary", "secondary")  # Today, Tomorrow, Week
     elif 'week-btn' in ctx_triggered:
         games_to_show = week_games or []
         title = "This Week's Games"
-        button_colors = ("secondary", "secondary", "primary")
     else:
-        # Default to Today (including when Research tab opens)
         games_to_show = today_games or []
         title = "Today's Games"
-        button_colors = ("primary", "secondary", "secondary")
     
     if not games_to_show:
         games_content = html.Div([
@@ -1861,12 +2059,6 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab,
                    className="text-center text-muted py-4")
         ])
         team_options = []
-        return (dbc.CardBody(games_content), 
-                team_options, 
-                team_options, 
-                button_colors[0],  # Today button color
-                button_colors[1],  # Tomorrow button color  
-                button_colors[2])  # Week button color
     else:
         games_content = html.Div([
             html.Div([
@@ -1893,12 +2085,7 @@ def update_games_display(today_clicks, tomorrow_clicks, week_clicks, active_tab,
         # Sort team options alphabetically for easier searching
         team_options.sort(key=lambda x: x['label'])
     
-    return (dbc.CardBody(games_content), 
-            team_options, 
-            team_options, 
-            button_colors[0],  # Today button color
-            button_colors[1],  # Tomorrow button color  
-            button_colors[2])  # Week button color
+    return dbc.CardBody(games_content), team_options, team_options
 
 # Auto-populate team selectors when game is clicked
 @app.callback(
@@ -1942,7 +2129,7 @@ def populate_teams_from_game_click(game_clicks, today_games, tomorrow_games, wee
 
 def create_game_card(game, betting_odds_data=None):
     """Create a clickable card for displaying game information"""
-    status_color = "#4ade80" if game['is_live'] else "#71717a" if game['state'] == 'pre' else "#f87171"
+    status_color = "#4ade80" if game['is_live'] else "#666" if game['state'] == 'pre' else "#f87171"
     status_text = "LIVE" if game['is_live'] else "UPCOMING" if game['state'] == 'pre' else "FINAL"
     
     if game['is_final']:
@@ -1970,9 +2157,13 @@ def create_game_card(game, betting_odds_data=None):
         if betting_info:
             betting_total = betting_info.get('avg_total')
     
-    # Parse game time for upcoming games
+    # Parse game time for display with first/second half conversion
     time_display = game['clock']
-    if game['state'] == 'pre':
+    
+    if game['is_live']:
+        # Show raw ESPN time - user controls conversion with toggle
+        time_display = game['clock']
+    elif game['state'] == 'pre':
         try:
             dt_est = convert_utc_to_est(game['date'])
             if dt_est:
@@ -1986,6 +2177,12 @@ def create_game_card(game, betting_odds_data=None):
         dbc.Row([
             dbc.Col([
                 html.Div([
+                    html.Span(game.get('league', 'ncaab').upper(), style={
+                        "fontSize": "0.6rem", "fontWeight": "700",
+                        "color": "#f59e0b" if game.get('league') == 'nba' else "#60a5fa",
+                        "border": f"1px solid {'#f59e0b' if game.get('league') == 'nba' else '#60a5fa'}",
+                        "borderRadius": "3px", "padding": "1px 4px", "marginRight": "6px"
+                    }),
                     html.Span(status_text, style={"fontSize": "0.7rem", "color": status_color, "fontWeight": "600"}),
                     html.Span(f"  {time_display}", style={"fontSize": "0.7rem", "color": "#666", "marginLeft": "8px"})
                 ]),
@@ -2009,14 +2206,14 @@ def create_game_card(game, betting_odds_data=None):
                     ], style={"display": "inline-flex", "alignItems": "center"})
                 ], style={"display": "flex", "alignItems": "center"}),
                 html.Div([
-                    html.Span("Click to analyze teams →", style={"fontSize": "0.65rem", "color": "#4a5568", "fontStyle": "italic"})
+                    html.Span("Click to analyze teams →", style={"fontSize": "0.65rem", "color": "#555", "fontStyle": "italic"})
                 ], style={"marginTop": "4px"})
             ], width=7),
             dbc.Col([
                 html.Div([
                     html.Span("Line: " if betting_total else "Total: ", style={"fontSize": "0.7rem", "color": "#666"}),
                     html.Span(str(betting_total) if betting_total else (str(total_score) if total_score is not None else "—"), 
-                             style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#10d9c4" if betting_total else "#f59e0b"})
+                             style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#4a9eff" if betting_total else "#f59e0b"})
                 ], className="text-right")
             ], width=5)
         ])
@@ -2030,31 +2227,30 @@ def create_game_card(game, betting_odds_data=None):
         "transition": "all 0.2s ease"
     }, className="analysis-game-card")
 
-def get_team_stats(team_id, num_games=10):
+def get_team_stats(team_id, num_games=10, league='ncaab'):
     """Helper function to get team statistics"""
     try:
         if not team_id:
             return None
         
-        recent_games = fetch_team_recent_games(team_id, num_games)
+        recent_games = fetch_team_recent_games(team_id, num_games, league=league)
         if not recent_games:
             print(f"No recent games found for team {team_id}")
             return None
         
-        # Calculate averages
+        game_minutes = 48 if league == 'nba' else 40
+        
         avg_team_score = sum(g['team_score'] for g in recent_games) / len(recent_games)
         avg_opp_score = sum(g['opponent_score'] for g in recent_games) / len(recent_games)
         avg_total = sum(g['total_points'] for g in recent_games) / len(recent_games)
         
-        # Calculate additional stats
         home_games = [g for g in recent_games if g.get('location') == 'Home']
         away_games = [g for g in recent_games if g.get('location') == 'Away']
         
         home_avg = sum(g['team_score'] for g in home_games) / len(home_games) if home_games else 0
         away_avg = sum(g['team_score'] for g in away_games) / len(away_games) if away_games else 0
         
-        # Calculate points per minute (PPG / 40)
-        avg_points_per_minute = avg_team_score / 40
+        avg_points_per_minute = avg_team_score / game_minutes
         
         return {
             'recent_games': recent_games,
@@ -2104,10 +2300,9 @@ def update_games_count_display(games_count):
     Input("team2_selector", "value"),
     Input("games_count_input", "value"),
     State("team1_selector", "options"),
-    State("team2_selector", "options"),
-    State("betting_odds_data", "data")
+    State("team2_selector", "options")
 )
-def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options, betting_odds_data):
+def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2_options):
     """Update team comparison analysis display"""
     if not team1_id and not team2_id:
         return dbc.CardBody([
@@ -2149,35 +2344,13 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
         implied_total = team1_stats['avg_team_score'] + team2_stats['avg_team_score']
         implied_total_per_min = implied_total / 40
         
-        # Get betting line for this matchup
-        betting_info = None
-        if betting_odds_data and team1_name and team2_name:
-            # Try both possible key combinations
-            match_key1 = f"{team1_name}|{team2_name}"
-            match_key2 = f"{team2_name}|{team1_name}"
-            betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
-        
         comparison_content.extend([
             html.Div([
                 html.H6("Team Comparison", style={"color": "#e5e5e5", "textAlign": "center"}),
-                
-                dbc.Row([
-                    dbc.Col([
-                        html.Div([
-                            html.Div("Projected Total pts/min", className="metric-label"),
-                            html.Div(f"{implied_total_per_min:.2f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
-                        ])
-                    ], className="text-center", width=6),
-                    dbc.Col([
-                        html.Div([
-                            html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
-                            html.Div(
-                                f"{betting_info['avg_total']:.1f} ({betting_info['avg_total'] / 40:.2f} pts/min)" if betting_info else "No Line", 
-                                style={"fontSize": "1.4rem", "fontWeight": "700", 
-                                       "color": "#10d9c4" if betting_info else "#71717a"})
-                        ])
-                    ], className="text-center", width=6),
-                ], className="mb-4")
+                html.Div([
+                    html.Span("Implied Total pts/min: ", style={"fontSize": "0.9rem", "color": "#666"}),
+                    html.Span(f"{implied_total_per_min:.2f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
+                ], className="text-center mb-4")
             ]),
             
             dbc.Row([
@@ -2192,12 +2365,6 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team1_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#4ade80", "textAlign": "center"}),
-                    html.Div("PTS/MIN", className="metric-label text-center mt-2"),
-                    html.Div(f"{team1_stats['avg_points_per_minute']:.2f}", 
-                            style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b", "textAlign": "center"}),
-                    html.Div("vs OPP", className="metric-label text-center mt-2"),
-                    html.Div(f"{team1_stats['avg_opp_score']:.1f}", 
-                            style={"fontSize": "1.2rem", "color": "#f87171", "textAlign": "center"}),
                 ], width=5),
                 
                 # VS Column
@@ -2217,12 +2384,6 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                     html.Div("AVG PPG", className="metric-label text-center"),
                     html.Div(f"{team2_stats['avg_team_score']:.1f}", 
                             style={"fontSize": "1.8rem", "fontWeight": "700", "color": "#3b82f6", "textAlign": "center"}),
-                    html.Div("PTS/MIN", className="metric-label text-center mt-2"),
-                    html.Div(f"{team2_stats['avg_points_per_minute']:.2f}", 
-                            style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b", "textAlign": "center"}),
-                    html.Div("vs OPP", className="metric-label text-center mt-2"),
-                    html.Div(f"{team2_stats['avg_opp_score']:.1f}", 
-                            style={"fontSize": "1.2rem", "color": "#f87171", "textAlign": "center"}),
                 ], width=5),
             ], className="mb-4"),
             
@@ -2260,11 +2421,6 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                 dbc.Col([
                     html.Div("TOTAL PPG", className="metric-label"),
                     html.Div(f"{team_stats['avg_total']:.1f}", 
-                            style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#f59e0b"})
-                ], className="text-center"),
-                dbc.Col([
-                    html.Div("PTS/MIN", className="metric-label"),
-                    html.Div(f"{team_stats['avg_points_per_minute']:.2f}", 
                             style={"fontSize": "1.2rem", "fontWeight": "600", "color": "#f59e0b"})
                 ], className="text-center"),
                 dbc.Col([
@@ -2310,7 +2466,7 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
                 ], className="mt-2", style={
                     "maxHeight": "200px", 
                     "overflowY": "auto",
-                    "border": "1px solid rgba(74, 85, 104, 0.2)",
+                    "border": "1px solid #2a2a2a",
                     "borderRadius": "6px",
                     "padding": "4px"
                 })
@@ -2318,6 +2474,26 @@ def update_team_comparison(team1_id, team2_id, games_count, team1_options, team2
         ])
     
     return dbc.CardBody(comparison_content)
+
+# Game Reminder Callbacks
+@app.callback(
+    Output("game_reminder_store", "data"),
+    Input("game_reminder_input", "value"),
+    prevent_initial_call=True
+)
+def save_game_reminder(value):
+    return value or ""
+
+@app.callback(
+    Output("game_reminder_input", "value"),
+    Input("refresh_games", "n_intervals"),
+    State("game_reminder_store", "data"),
+    prevent_initial_call=True
+)
+def load_game_reminder_on_startup(n_intervals, stored_value):
+    if n_intervals == 0 and stored_value:
+        return stored_value
+    raise dash.exceptions.PreventUpdate
 
 
 if __name__ == "__main__":
