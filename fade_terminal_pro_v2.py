@@ -3,6 +3,8 @@ from dash import html, dcc, Output, Input, State, ALL, ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from datetime import datetime, timedelta, timezone
 import json
 
@@ -576,7 +578,7 @@ def get_basketball_odds(sport_key='basketball_ncaab'):
     }
     
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, verify=False, timeout=15)
         response.raise_for_status()
         
         # Track usage from response headers
@@ -767,64 +769,6 @@ def score_input(label, input_id):
     ], className="mb-3")
 
 
-app.layout = dbc.Container([
-    # Game Reminder (top-left)
-    html.Div([
-        dbc.Input(
-            id="game_reminder_input",
-            type="text",
-            placeholder="Game reminder...",
-            style={"width": "200px", "fontSize": "0.8rem"}
-        )
-    ], style={"position": "absolute", "top": "12px", "left": "12px", "zIndex": "1000"}),
-    
-    # Header
-    html.Div([
-        html.H3("CBB Fade Terminal", style={"marginBottom": "0", "fontSize": "1.4rem"}),
-    ], className="text-center", style={"padding": "1.5rem 0 1rem 0"}),
-    
-    # Tabs
-    dbc.Tabs([
-        dbc.Tab(label="Live Analysis", tab_id="fade-tab"),
-        dbc.Tab(label="Research", tab_id="analysis-tab"),
-    ], id="main-tabs", active_tab="fade-tab", className="mb-3"),
-    
-    html.Div(id="tab-content"),
-    
-    # Stores
-    dcc.Store(id="opening_line", data=None),
-    dcc.Store(id="live_games_data", data=[]),
-    dcc.Store(id="selected_game_data", data=None),
-    dcc.Store(id="persistent_game_selection", data=None),
-    dcc.Store(id="today_games_data", data=[]),
-    dcc.Store(id="tomorrow_games_data", data=[]),
-    dcc.Store(id="week_games_data", data=[]),
-    dcc.Store(id="betting_odds_data", data={}),
-    dcc.Store(id="odds_api_status", data={}),
-    dcc.Store(id="game_reminder_store", data="", storage_type='local'),
-    dcc.Interval(id="refresh_games", interval=30*1000, n_intervals=0),
-    dcc.Interval(id="refresh_odds", interval=5*60*1000, n_intervals=0),
-    
-    # Game Selection Modal
-    dbc.Modal([
-        dbc.ModalHeader([
-            html.H5("Select Game", style={"margin": "0"}),
-        ], style={"background": "#1a1a1a", "borderBottom": "1px solid #2a2a2a"}),
-        dbc.ModalBody([
-            dbc.Input(
-                id="game_search_input",
-                placeholder="Search teams...", 
-                style={"marginBottom": "0.75rem"}
-            ),
-            html.Div(id="game_selection_grid", style={"maxHeight": "50vh", "overflowY": "auto"})
-        ], style={"background": "#1a1a1a", "padding": "1rem"}),
-        dbc.ModalFooter([
-            dbc.Button("Cancel", id="game_modal_close", className="btn-secondary", size="sm")
-        ], style={"background": "#1a1a1a", "borderTop": "1px solid #2a2a2a"})
-    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static")
-], fluid=True, style={"maxWidth": "1200px", "padding": "0 1.5rem"})
-
-
 def create_fade_tab():
     """Create the fade system tab layout"""
     return dbc.Row([
@@ -948,9 +892,11 @@ def create_fade_tab():
                         html.Div([
                             html.Span("Threshold: ", style={"color": "#888", "fontSize": "0.75rem"}),
                             html.Span(id="thresh_val", style={"color": "#e5e5e5", "fontWeight": "600"})
-                        ], className="mb-2"),
-                        dcc.Slider(id="threshold_slider", min=2.5, max=6, step=0.25, value=4.0,
-                                   marks={2.5: '2.5', 4: '4', 6: '6'})
+                        ], className="mb-1"),
+                        dcc.Slider(id="threshold_slider", min=2.0, max=7.0, step=0.25, value=4.0,
+                                   marks={2: '2', 3.5: '3.5', 5: '5', 7: '7'}),
+                        html.Div(id="threshold_source_label",
+                                 style={"fontSize": "0.65rem", "color": "#555", "textAlign": "center", "marginTop": "2px"})
                     ])
             ], className="pro-card")
         ], lg=4, md=5),
@@ -1054,6 +1000,65 @@ def create_analysis_tab():
         )
     ])
 
+
+app.layout = dbc.Container([
+    # Game Reminder (top-left)
+    html.Div([
+        dbc.Input(
+            id="game_reminder_input",
+            type="text",
+            placeholder="Game reminder...",
+            style={"width": "200px", "fontSize": "0.8rem"}
+        )
+    ], style={"position": "absolute", "top": "12px", "left": "12px", "zIndex": "1000"}),
+    
+    # Header
+    html.Div([
+        html.H3("CBB Fade Terminal", style={"marginBottom": "0", "fontSize": "1.4rem"}),
+    ], className="text-center", style={"padding": "1.5rem 0 1rem 0"}),
+    
+    # Tabs
+    dbc.Tabs([
+        dbc.Tab(label="Live Analysis", tab_id="fade-tab"),
+        dbc.Tab(label="Research", tab_id="analysis-tab"),
+    ], id="main-tabs", active_tab="fade-tab", className="mb-3"),
+    
+    html.Div(create_fade_tab(), id="tab-content"),
+    
+    # Stores
+    dcc.Store(id="opening_line", data=None),
+    dcc.Store(id="live_games_data", data=[]),
+    dcc.Store(id="selected_game_data", data=None),
+    dcc.Store(id="persistent_game_selection", data=None),
+    dcc.Store(id="today_games_data", data=[]),
+    dcc.Store(id="tomorrow_games_data", data=[]),
+    dcc.Store(id="week_games_data", data=[]),
+    dcc.Store(id="betting_odds_data", data={}),
+    dcc.Store(id="odds_api_status", data={}),
+    dcc.Store(id="threshold_source", data={"type": "manual", "detail": ""}),
+    dcc.Store(id="game_reminder_store", data="", storage_type='local'),
+    dcc.Interval(id="refresh_games", interval=30*1000, n_intervals=0),
+    dcc.Interval(id="refresh_odds", interval=5*60*1000, n_intervals=0),
+    
+    # Game Selection Modal
+    dbc.Modal([
+        dbc.ModalHeader([
+            html.H5("Select Game", style={"margin": "0"}),
+        ], style={"background": "#1a1a1a", "borderBottom": "1px solid #2a2a2a"}),
+        dbc.ModalBody([
+            dbc.Input(
+                id="game_search_input",
+                placeholder="Search teams...", 
+                style={"marginBottom": "0.75rem"}
+            ),
+            html.Div(id="game_selection_grid", style={"maxHeight": "50vh", "overflowY": "auto"})
+        ], style={"background": "#1a1a1a", "padding": "1rem"}),
+        dbc.ModalFooter([
+            dbc.Button("Cancel", id="game_modal_close", className="btn-secondary", size="sm")
+        ], style={"background": "#1a1a1a", "borderTop": "1px solid #2a2a2a"})
+    ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static")
+], fluid=True, style={"maxWidth": "1200px", "padding": "0 1.5rem"})
+
 @app.callback(
     Output("tab-content", "children"),
     Input("main-tabs", "active_tab")
@@ -1110,7 +1115,25 @@ def nudge_secs(up, down, val):
     raise dash.exceptions.PreventUpdate
 
 @app.callback(Output("thresh_val", "children"), Input("threshold_slider", "value"))
-def show_thresh(v): return f"{v}"
+def show_thresh(v):
+    return f"{v} pts/min"
+
+@app.callback(
+    Output("threshold_source_label", "children"),
+    Input("threshold_source", "data")
+)
+def update_threshold_source_label(source_data):
+    if not source_data or not isinstance(source_data, dict):
+        return ""
+    source_type = source_data.get("type", "manual")
+    detail = source_data.get("detail", "")
+    if source_type == "blended":
+        return f"via {detail}"
+    elif source_type == "market":
+        return f"via market line ({detail})"
+    elif source_type == "historical":
+        return f"via team history ({detail})"
+    return ""
 
 @app.callback(Output("period_type", "options"), Output("period_type", "value"), Input("game_length", "value"))
 def update_periods(gl):
@@ -1448,12 +1471,14 @@ def store_selected_game(game_id, games_data):
     Output("mins_left", "value", allow_duplicate=True),
     Output("secs_left", "value", allow_duplicate=True),
     Output("game_length", "value", allow_duplicate=True),
+    Output("threshold_slider", "value", allow_duplicate=True),
+    Output("threshold_source", "data", allow_duplicate=True),
     Input("selected_game_data", "data"),
     State("betting_odds_data", "data"),
     prevent_initial_call=True
 )
 def auto_fill_from_game(game_data, betting_odds_data):
-    """Auto-fill scores, time, league, and live total from selected game"""
+    """Auto-fill scores, time, league, live total, and smart threshold from selected game"""
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
@@ -1465,7 +1490,6 @@ def auto_fill_from_game(game_data, betting_odds_data):
     if away_score == 0 and not game_data.get('is_live'):
         away_score = None
     
-    # Auto-select league based on game
     league = game_data.get('league', 'ncaab')
     game_length = 48 if league == 'nba' else 40
     
@@ -1494,8 +1518,9 @@ def auto_fill_from_game(game_data, betting_odds_data):
             minutes_left = 0
             seconds_left = 0
     
-    # Get betting odds total for live_total - ONLY if betting line exists
+    # Get betting odds total for live_total
     live_total = None
+    betting_total_found = False
     if betting_odds_data and game_data:
         away_team_name = game_data.get('away_team', '')
         home_team_name = game_data.get('home_team', '')
@@ -1507,13 +1532,54 @@ def auto_fill_from_game(game_data, betting_odds_data):
         if betting_info:
             live_total = betting_info.get('avg_total')
             if live_total:
-                print(f"DEBUG: ✅ Found betting total: {live_total}")
+                betting_total_found = True
+                print(f"DEBUG: Found betting total: {live_total}")
     
-    # Leave live_total as None if no betting line found
     if live_total is None:
         print(f"DEBUG: No betting line found - leaving Live Total empty")
     
-    print(f"DEBUG: Auto-filling - away:{away_score}, home:{home_score}, total:{live_total}, time:{minutes_left}:{seconds_left:02d}")
+    # --- Smart Threshold: blend book line + team history ---
+    expected_pace = None
+    threshold_source = {"type": "manual", "detail": ""}
+    
+    book_pace = (live_total / game_length) if (betting_total_found and live_total) else None
+    
+    # Try to get team historical pace
+    historical_pace = None
+    home_team_id = game_data.get('home_team_id')
+    away_team_id = game_data.get('away_team_id')
+    if home_team_id and away_team_id:
+        try:
+            home_stats = get_team_stats(home_team_id, 5, league=league)
+            away_stats = get_team_stats(away_team_id, 5, league=league)
+            if home_stats and away_stats:
+                historical_pace = home_stats['avg_points_per_minute'] + away_stats['avg_points_per_minute']
+        except Exception as e:
+            print(f"DEBUG: Error computing historical pace: {e}")
+    
+    # Blend: 60% book + 40% history when both available
+    if book_pace is not None and historical_pace is not None:
+        expected_pace = (book_pace * 0.6) + (historical_pace * 0.4)
+        threshold_source = {"type": "blended", "detail": f"60% book + 40% history"}
+        print(f"DEBUG: Smart threshold (blended): book={book_pace:.2f}, hist={historical_pace:.2f}, blend={expected_pace:.2f}")
+    elif book_pace is not None:
+        expected_pace = book_pace
+        threshold_source = {"type": "market", "detail": f"{live_total} / {game_length}m"}
+        print(f"DEBUG: Smart threshold (market only): {expected_pace:.2f}")
+    elif historical_pace is not None:
+        expected_pace = historical_pace
+        threshold_source = {"type": "historical", "detail": "5-game avg"}
+        print(f"DEBUG: Smart threshold (history only): {expected_pace:.2f}")
+    
+    # Round to nearest 0.25 for clean slider steps, clamp to slider range
+    if expected_pace is not None:
+        threshold_value = round(expected_pace * 4) / 4
+        threshold_value = max(2.0, min(7.0, threshold_value))
+    else:
+        threshold_value = dash.no_update
+        threshold_source = dash.no_update
+    
+    print(f"DEBUG: Auto-filling - away:{away_score}, home:{home_score}, total:{live_total}, time:{minutes_left}:{seconds_left:02d}, threshold:{threshold_value}")
     
     return (
         away_score,
@@ -1521,7 +1587,9 @@ def auto_fill_from_game(game_data, betting_odds_data):
         live_total,
         minutes_left,
         seconds_left,
-        game_length
+        game_length,
+        threshold_value,
+        threshold_source
     )
 
 @app.callback(
@@ -1864,9 +1932,36 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                 reverse_key = f"{home_team_name}|{away_team_name}"
                 betting_info = betting_odds_data.get(reverse_key)
         
+        # Compute pace breakdown
+        historical_pace = away_stats['avg_points_per_minute'] + home_stats['avg_points_per_minute']
+        
+        book_pace = None
+        if betting_info:
+            book_pace = betting_info['avg_total'] / game_minutes
+        
+        # Blended expected pace: weight book line 60/40 over history when available
+        if book_pace is not None:
+            expected_pace = (book_pace * 0.6) + (historical_pace * 0.4)
+            pace_source = "blended"
+        else:
+            expected_pace = historical_pace
+            pace_source = "historical"
+        
+        # Pace difference between sources
+        pace_delta = None
+        pace_delta_label = ""
+        if book_pace is not None:
+            pace_delta = book_pace - historical_pace
+            if pace_delta > 0:
+                pace_delta_label = f"Book is {abs(pace_delta):.2f} higher"
+            elif pace_delta < 0:
+                pace_delta_label = f"Book is {abs(pace_delta):.2f} lower"
+            else:
+                pace_delta_label = "Book matches history"
+        
         return html.Div([
         html.Div([
-            # Clean Header with Team Logos
+            # Header
             html.Div([
                 html.H5("Matchup Intelligence", 
                        style={"color": "#e5e5e5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
@@ -1880,130 +1975,174 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                             className="team-logo") if selected_game_data.get('home_team_logo') else None,
                     html.Span(home_team_name, style={"color": "#34d399"})
                 ], style={"display": "flex", "alignItems": "center", "fontSize": "0.9rem", "margin": "0"})
-            ], style={"marginBottom": "1.5rem"}),
+            ], style={"marginBottom": "1rem"}),
             
-            # Key Metrics Row
+            # === EXPECTED PACE HERO ===
+            html.Div([
+                html.Div([
+                    html.Div("EXPECTED PACE", style={
+                        "fontSize": "0.65rem", "fontWeight": "700", "letterSpacing": "1.5px",
+                        "color": "#888", "marginBottom": "0.3rem"
+                    }),
+                    html.Div([
+                        html.Span(f"{expected_pace:.2f}", style={
+                            "fontSize": "2.2rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"
+                        }),
+                        html.Span(" pts/min", style={
+                            "fontSize": "0.8rem", "color": "#888", "marginLeft": "6px", "verticalAlign": "baseline"
+                        }),
+                    ]),
+                    html.Div(
+                        f"{'60% book + 40% history' if pace_source == 'blended' else f'{games_count}-game history'}",
+                        style={"fontSize": "0.65rem", "color": "#555", "marginTop": "0.25rem"}
+                    ),
+                ], className="text-center", style={"flex": "1"}),
+            ], style={
+                "background": "#161616",
+                "border": "1px solid #f59e0b33",
+                "borderRadius": "8px",
+                "padding": "1rem",
+                "marginBottom": "1rem"
+            }),
+            
+            # === PACE SOURCES COMPARISON ===
             dbc.Row([
                 dbc.Col([
                     html.Div([
-                        html.Div("Projected Total pts/min", className="metric-label"),
-                        html.Div(f"{implied_total_per_min:.2f}", 
-                                style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
-                    ])
-                ], className="text-center", width=4),
-                dbc.Col([
-                    html.Div([
-                        html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
-                        html.Div(f"{betting_info['avg_total']:.1f}" if betting_info else "No Line", 
-                                style={"fontSize": "1.6rem", "fontWeight": "700", 
-                                      "color": "#4a9eff" if betting_info else "#666", "lineHeight": "1"})
-                    ])
-                ], className="text-center", width=4),
-                dbc.Col([
-                    html.Div([
-                        html.Div("Avg Scoring", className="metric-label"),
+                        html.Div("BOOK LINE", className="metric-label"),
                         html.Div(
-                            f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}",
-                            style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#d4d4d8", "lineHeight": "1"})
+                            f"{betting_info['avg_total']:.1f}" if betting_info else "N/A",
+                            style={"fontSize": "1.3rem", "fontWeight": "700", 
+                                   "color": "#4a9eff" if betting_info else "#555", "lineHeight": "1"}
+                        ),
+                        html.Div(
+                            f"{book_pace:.2f} pts/min" if book_pace else "",
+                            style={"fontSize": "0.75rem", "color": "#4a9eff88", "marginTop": "2px"}
+                        ),
+                        html.Div(
+                            f"({betting_info['num_books']} books)" if betting_info else "",
+                            style={"fontSize": "0.6rem", "color": "#555"}
+                        ),
                     ])
                 ], className="text-center", width=4),
-            ], className="mb-4"),
+                dbc.Col([
+                    html.Div([
+                        html.Div("TEAM HISTORY", className="metric-label"),
+                        html.Div(
+                            f"{implied_total:.0f}",
+                            style={"fontSize": "1.3rem", "fontWeight": "700", "color": "#a78bfa", "lineHeight": "1"}
+                        ),
+                        html.Div(
+                            f"{historical_pace:.2f} pts/min",
+                            style={"fontSize": "0.75rem", "color": "#a78bfa88", "marginTop": "2px"}
+                        ),
+                        html.Div(
+                            f"({games_count} games)",
+                            style={"fontSize": "0.6rem", "color": "#555"}
+                        ),
+                    ])
+                ], className="text-center", width=4),
+                dbc.Col([
+                    html.Div([
+                        html.Div("DELTA", className="metric-label"),
+                        html.Div(
+                            f"{'+' if pace_delta and pace_delta > 0 else ''}{pace_delta:.2f}" if pace_delta is not None else "N/A",
+                            style={"fontSize": "1.3rem", "fontWeight": "700", 
+                                   "color": "#ef4444" if (pace_delta and pace_delta > 0.15) else "#4ade80" if (pace_delta is not None and pace_delta < -0.15) else "#888",
+                                   "lineHeight": "1"}
+                        ),
+                        html.Div(
+                            pace_delta_label,
+                            style={"fontSize": "0.7rem", "color": "#666", "marginTop": "2px"}
+                        ),
+                    ])
+                ], className="text-center", width=4),
+            ], className="mb-3"),
             
-            # Team Cards
+            html.Hr(style={"borderColor": "#2a2a2a", "margin": "0.75rem 0"}),
+            
+            # === TEAM BREAKDOWN ===
             dbc.Row([
                 # Away Team
                 dbc.Col([
                     html.Div([
                         html.Div([
-                            # Team logo and name
-                            html.Div([
-                                html.Img(src=selected_game_data.get('away_team_logo', ''), 
-                                        style={"width": "24px", "height": "24px", "marginRight": "8px", "borderRadius": "3px"},
-                                        className="team-logo") if selected_game_data.get('away_team_logo') else None,
-                                html.H6(away_team_name[:18] + "..." if len(away_team_name) > 18 else away_team_name, 
-                                       style={"color": "#60a5fa", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0", "display": "inline"})
-                            ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
-                            html.Div(f"{away_stats['avg_team_score']:.1f}", 
-                                    style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#666", "marginBottom": "0.5rem"}),
-                            
-                            html.Div([
-                                html.Span(f"{away_stats['avg_points_per_minute']:.2f}", 
-                                         style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
-                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "2px"})
-                            ], className="mb-2"),
-                            
-                            html.Div([
-                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#999"}),
-                                html.Span(f"{away_stats['avg_opp_score']:.1f}", 
-                                         style={"fontSize": "0.75rem", "color": "#f87171", "fontWeight": "500"})
-                            ], className="mb-1"),
-                            
-                            html.Div([
-                                html.Span("Road: ", style={"fontSize": "0.75rem", "color": "#999"}),
-                                html.Span(f"{away_stats['away_avg']:.1f}" if away_stats['away_games'] > 0 else "N/A", 
-                                         style={"fontSize": "0.75rem", "color": "#d4d4d8", "fontWeight": "500"})
-                            ])
-                        ])
+                            html.Img(src=selected_game_data.get('away_team_logo', ''), 
+                                    style={"width": "22px", "height": "22px", "marginRight": "6px", "borderRadius": "3px"},
+                                    className="team-logo") if selected_game_data.get('away_team_logo') else None,
+                            html.Span(away_team_name[:18] + "..." if len(away_team_name) > 18 else away_team_name, 
+                                   style={"color": "#60a5fa", "fontSize": "0.85rem", "fontWeight": "600"})
+                        ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
+                        
+                        html.Div([
+                            html.Span(f"{away_stats['avg_team_score']:.1f}", 
+                                    style={"fontSize": "1.3rem", "fontWeight": "700", "color": "#60a5fa"}),
+                            html.Span(" ppg", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "4px"}),
+                        ]),
+                        html.Div([
+                            html.Span(f"{away_stats['avg_points_per_minute']:.2f}", 
+                                     style={"fontSize": "0.9rem", "color": "#f59e0b", "fontWeight": "600"}),
+                            html.Span(" pts/min", style={"fontSize": "0.6rem", "color": "#666", "marginLeft": "2px"})
+                        ], className="mb-2"),
+                        
+                        html.Div([
+                            html.Span("Allows ", style={"fontSize": "0.7rem", "color": "#888"}),
+                            html.Span(f"{away_stats['avg_opp_score']:.1f}", 
+                                     style={"fontSize": "0.7rem", "color": "#f87171", "fontWeight": "600"}),
+                        ], className="mb-1"),
+                        html.Div([
+                            html.Span("Road avg ", style={"fontSize": "0.7rem", "color": "#888"}),
+                            html.Span(f"{away_stats['away_avg']:.1f}" if away_stats['away_games'] > 0 else "N/A", 
+                                     style={"fontSize": "0.7rem", "color": "#d4d4d8", "fontWeight": "500"}),
+                        ]),
                     ], style={
-                        "background": "#1e1e1e",
-                        "border": "1px solid #2a2a2a",
-                        "borderRadius": "8px",
-                        "padding": "1rem"
+                        "background": "#1e1e1e", "border": "1px solid #2a2a2a",
+                        "borderRadius": "8px", "padding": "0.75rem"
                     })
                 ], width=5),
                 
-                # VS Separator
                 dbc.Col([
-                    html.Div("VS", 
-                            style={
-                                "textAlign": "center", 
-                                "fontSize": "0.8rem", 
-                                "color": "#666", 
-                                "fontWeight": "600",
-                                "paddingTop": "2rem"
-                            })
+                    html.Div("VS", style={
+                        "textAlign": "center", "fontSize": "0.75rem", 
+                        "color": "#555", "fontWeight": "600", "paddingTop": "1.5rem"
+                    })
                 ], width=2),
                 
                 # Home Team
                 dbc.Col([
                     html.Div([
                         html.Div([
-                            # Team logo and name
-                            html.Div([
-                                html.Img(src=selected_game_data.get('home_team_logo', ''), 
-                                        style={"width": "24px", "height": "24px", "marginRight": "8px", "borderRadius": "3px"},
-                                        className="team-logo") if selected_game_data.get('home_team_logo') else None,
-                                html.H6(home_team_name[:18] + "..." if len(home_team_name) > 18 else home_team_name,
-                                       style={"color": "#34d399", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0", "display": "inline"})
-                            ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
-                            html.Div(f"{home_stats['avg_team_score']:.1f}", 
-                                    style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#34d399", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#666", "marginBottom": "0.5rem"}),
-                            
-                            html.Div([
-                                html.Span(f"{home_stats['avg_points_per_minute']:.2f}", 
-                                         style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
-                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "2px"})
-                            ], className="mb-2"),
-                            
-                            html.Div([
-                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#999"}),
-                                html.Span(f"{home_stats['avg_opp_score']:.1f}", 
-                                         style={"fontSize": "0.75rem", "color": "#f87171", "fontWeight": "500"})
-                            ], className="mb-1"),
-                            
-                            html.Div([
-                                html.Span("Home: ", style={"fontSize": "0.75rem", "color": "#999"}),
-                                html.Span(f"{home_stats['home_avg']:.1f}" if home_stats['home_games'] > 0 else "N/A", 
-                                         style={"fontSize": "0.75rem", "color": "#d4d4d8", "fontWeight": "500"})
-                            ])
-                        ])
+                            html.Img(src=selected_game_data.get('home_team_logo', ''), 
+                                    style={"width": "22px", "height": "22px", "marginRight": "6px", "borderRadius": "3px"},
+                                    className="team-logo") if selected_game_data.get('home_team_logo') else None,
+                            html.Span(home_team_name[:18] + "..." if len(home_team_name) > 18 else home_team_name,
+                                   style={"color": "#34d399", "fontSize": "0.85rem", "fontWeight": "600"})
+                        ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
+                        
+                        html.Div([
+                            html.Span(f"{home_stats['avg_team_score']:.1f}", 
+                                    style={"fontSize": "1.3rem", "fontWeight": "700", "color": "#34d399"}),
+                            html.Span(" ppg", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "4px"}),
+                        ]),
+                        html.Div([
+                            html.Span(f"{home_stats['avg_points_per_minute']:.2f}", 
+                                     style={"fontSize": "0.9rem", "color": "#f59e0b", "fontWeight": "600"}),
+                            html.Span(" pts/min", style={"fontSize": "0.6rem", "color": "#666", "marginLeft": "2px"})
+                        ], className="mb-2"),
+                        
+                        html.Div([
+                            html.Span("Allows ", style={"fontSize": "0.7rem", "color": "#888"}),
+                            html.Span(f"{home_stats['avg_opp_score']:.1f}", 
+                                     style={"fontSize": "0.7rem", "color": "#f87171", "fontWeight": "600"}),
+                        ], className="mb-1"),
+                        html.Div([
+                            html.Span("Home avg ", style={"fontSize": "0.7rem", "color": "#888"}),
+                            html.Span(f"{home_stats['home_avg']:.1f}" if home_stats['home_games'] > 0 else "N/A", 
+                                     style={"fontSize": "0.7rem", "color": "#d4d4d8", "fontWeight": "500"}),
+                        ]),
                     ], style={
-                        "background": "#1e1e1e",
-                        "border": "1px solid #2a2a2a",
-                        "borderRadius": "8px",
-                        "padding": "1rem"
+                        "background": "#1e1e1e", "border": "1px solid #2a2a2a",
+                        "borderRadius": "8px", "padding": "0.75rem"
                     })
                 ], width=5),
             ])
