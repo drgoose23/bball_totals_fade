@@ -1896,7 +1896,9 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
                         html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
                         html.Div(f"{betting_info['avg_total']:.1f}" if betting_info else "No Line", 
                                 style={"fontSize": "1.6rem", "fontWeight": "700", 
-                                      "color": "#4a9eff" if betting_info else "#666", "lineHeight": "1"})
+                                      "color": "#4a9eff" if betting_info else "#666", "lineHeight": "1"}),
+                        html.Div(f"{betting_info['avg_total'] / game_minutes:.2f} pts/min", 
+                                style={"fontSize": "0.7rem", "color": "#4a9eff", "opacity": "0.7", "marginTop": "2px"}) if betting_info else None
                     ])
                 ], className="text-center", width=4),
                 dbc.Col([
