@@ -596,16 +596,42 @@ def get_basketball_odds(sport_key='basketball_ncaab'):
             print(f"   Response: {e.response.text[:200]}")
         return []
 
+def _normalize_team_name(name):
+    """Normalize a team name for fuzzy matching across ESPN and Odds API"""
+    if not name:
+        return ""
+    n = name.lower().strip()
+    # Strip common suffixes that differ between APIs
+    for suffix in [' bulldogs', ' blue devils', ' tar heels', ' wildcats', ' tigers',
+                   ' bears', ' eagles', ' hawks', ' huskies', ' knights', ' lions',
+                   ' panthers', ' rams', ' warriors', ' wolves', ' cougars',
+                   ' cardinals', ' cavaliers', ' commodores', ' crimson tide',
+                   ' demon deacons', ' fighting irish', ' gators', ' golden gophers',
+                   ' hawkeyes', ' hoosiers', ' hurricanes', ' jayhawks', ' longhorns',
+                   ' mountaineers', ' nittany lions', ' orange', ' orangemen',
+                   ' razorbacks', ' red raiders', ' seminoles', ' sooners',
+                   ' spartans', ' terrapins', ' volunteers', ' wolverines',
+                   ' yellow jackets', ' boilermakers', ' buckeyes', ' bruins',
+                   ' trojans', ' badgers', ' cornhuskers', ' ducks', ' beavers',
+                   ' utes', ' buffaloes', ' sun devils', ' rebels', ' aggies',
+                   ' owls', ' red storm', ' friars', ' hoyas', ' blue jays',
+                   ' musketeers', ' pirates', ' explorers', ' gaels']:
+        if n.endswith(suffix):
+            n = n[:-len(suffix)].strip()
+            break
+    # Also strip state abbreviations and common words
+    for word in ['state', 'university', 'college', 'st.', 'st']:
+        n = n.replace(f' {word} ', ' ').replace(f' {word}', '').strip()
+    return n
+
 def extract_betting_totals(odds_games):
-    """Extract betting totals from odds data"""
+    """Extract betting totals from odds data with normalized name keys for matching"""
     betting_data = {}
     
     for game in odds_games:
-        # Create key from team names for matching
         home_team = game['home_team']
         away_team = game['away_team']
         
-        # Extract totals from all sportsbooks
         totals = []
         for bookmaker in game.get('bookmakers', []):
             for market in bookmaker.get('markets', []):
@@ -618,12 +644,6 @@ def extract_betting_totals(odds_games):
             avg_total = sum(totals) / len(totals)
             total_range = max(totals) - min(totals) if len(totals) > 1 else 0
             
-            # Store with multiple possible team name combinations
-            game_keys = [
-                f"{away_team}|{home_team}",
-                f"{home_team}|{away_team}"
-            ]
-            
             betting_info = {
                 'avg_total': avg_total,
                 'total_range': total_range,
@@ -631,10 +651,36 @@ def extract_betting_totals(odds_games):
                 'commence_time': game['commence_time']
             }
             
-            for key in game_keys:
-                betting_data[key] = betting_info
+            # Store under exact names (both orderings)
+            betting_data[f"{away_team}|{home_team}"] = betting_info
+            betting_data[f"{home_team}|{away_team}"] = betting_info
+            # Also store under normalized names for fuzzy matching
+            norm_away = _normalize_team_name(away_team)
+            norm_home = _normalize_team_name(home_team)
+            betting_data[f"{norm_away}|{norm_home}"] = betting_info
+            betting_data[f"{norm_home}|{norm_away}"] = betting_info
+    
+    if odds_games:
+        sample_names = [(g['away_team'], g['home_team']) for g in odds_games[:3]]
+        print(f"📊 Odds API sample names: {sample_names}")
     
     return betting_data
+
+def _find_betting_info(away_team, home_team, betting_data):
+    """Look up betting info trying exact names first, then normalized fuzzy match"""
+    if not betting_data:
+        return None
+    # Exact match
+    info = betting_data.get(f"{away_team}|{home_team}") or betting_data.get(f"{home_team}|{away_team}")
+    if info:
+        return info
+    # Normalized match
+    norm_away = _normalize_team_name(away_team)
+    norm_home = _normalize_team_name(home_team)
+    info = betting_data.get(f"{norm_away}|{norm_home}") or betting_data.get(f"{norm_home}|{norm_away}")
+    if info:
+        return info
+    return None
 
 def match_espn_with_odds(espn_games, betting_data):
     """Match ESPN games with betting lines"""
@@ -644,9 +690,7 @@ def match_espn_with_odds(espn_games, betting_data):
         home_team = espn_game.get('home_team', '')
         away_team = espn_game.get('away_team', '')
         
-        # Try to match with betting data
-        match_key = f"{away_team}|{home_team}"
-        betting_info = betting_data.get(match_key)
+        betting_info = _find_betting_info(away_team, home_team, betting_data)
         
         # Add betting data if found
         enhanced_game = espn_game.copy()
@@ -1525,10 +1569,7 @@ def auto_fill_from_game(game_data, betting_odds_data):
         away_team_name = game_data.get('away_team', '')
         home_team_name = game_data.get('home_team', '')
         
-        match_key1 = f"{away_team_name}|{home_team_name}"
-        match_key2 = f"{home_team_name}|{away_team_name}"
-        
-        betting_info = betting_odds_data.get(match_key1) or betting_odds_data.get(match_key2)
+        betting_info = _find_betting_info(away_team_name, home_team_name, betting_odds_data)
         if betting_info:
             live_total = betting_info.get('avg_total')
             if live_total:
@@ -1921,16 +1962,7 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
         implied_total_per_min = implied_total / game_minutes
         
         # Get betting line for this matchup
-        betting_info = None
-        if betting_odds_data:
-            # Try to match with betting data using team names
-            match_key = f"{away_team_name}|{home_team_name}"
-            betting_info = betting_odds_data.get(match_key)
-            
-            # Try reverse if not found
-            if not betting_info:
-                reverse_key = f"{home_team_name}|{away_team_name}"
-                betting_info = betting_odds_data.get(reverse_key)
+        betting_info = _find_betting_info(away_team_name, home_team_name, betting_odds_data) if betting_odds_data else None
         
         # Compute pace breakdown
         historical_pace = away_stats['avg_points_per_minute'] + home_stats['avg_points_per_minute']
@@ -2284,15 +2316,9 @@ def create_game_card(game, betting_odds_data=None):
     # Get betting total from odds data
     betting_total = None
     if betting_odds_data:
-        # Try to match with betting data using the correct key format
         away_team = game.get('away_team', '')
         home_team = game.get('home_team', '')
-        
-        # Try both possible key combinations  
-        game_key1 = f"{away_team}|{home_team}"
-        game_key2 = f"{home_team}|{away_team}"
-        
-        betting_info = betting_odds_data.get(game_key1) or betting_odds_data.get(game_key2)
+        betting_info = _find_betting_info(away_team, home_team, betting_odds_data)
         if betting_info:
             betting_total = betting_info.get('avg_total')
     
