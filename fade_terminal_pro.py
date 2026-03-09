@@ -355,7 +355,8 @@ app.index_string = '''
 
 PERIOD_TIME_MAPS = {
     40: {'Q (10m)': 10, 'H (20m)': 20, 'FG (40m)': 40},
-    48: {'Q (12m)': 12, 'H (24m)': 24, 'FG (48m)': 48}
+    48: {'Q (12m)': 12, 'H (24m)': 24, 'FG (48m)': 48},
+    'intl': {'Q (10m)': 10, 'H (20m)': 20, 'FG (40m)': 40}
 }
 
 def get_team_logo_url(team_data):
@@ -390,16 +391,22 @@ def get_team_logo_url(team_data):
     
     return ''
 
-def fetch_games_by_date(date_str=None):
-    """Fetch college basketball games from ESPN's internal API for a specific date"""
+def fetch_games_by_date(date_str=None, league='ncaab'):
+    """Fetch basketball games from ESPN for a specific date and league.
+    league: 'ncaab' for college, 'nba' for pro
+    """
     try:
-        if date_str:
-            # limit=300 and groups=50 ensure we get ALL games, not just top 25
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}&limit=300&groups=50"
+        if not date_str:
+            date_str = datetime.now().strftime('%Y%m%d')
+        
+        if league == 'nba':
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={date_str}"
+            quarter_minutes = 12
+            total_game_minutes = 48
         else:
-            # For "today", use current date regardless of time - college games often span midnight
-            today_str = datetime.now().strftime('%Y%m%d')
-            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={today_str}&limit=300&groups=50"
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={date_str}&limit=300&groups=50"
+            quarter_minutes = 20  # NCAA uses halves
+            total_game_minutes = 40
         
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -419,18 +426,8 @@ def fetch_games_by_date(date_str=None):
             
             state = status.get('type', {}).get('state', '')
             
-            # Extract team logos from ESPN data
             home_team_data = home_team.get('team', {})
             away_team_data = away_team.get('team', {})
-            
-            # Debug: Print available team data keys (remove after testing)
-            if len(games) == 0:  # Only print for first game to avoid spam
-                print(f"DEBUG: Home team data keys: {list(home_team_data.keys())}")
-                if 'logos' in home_team_data:
-                    print(f"DEBUG: Home team logos: {home_team_data.get('logos')}")
-                if 'logo' in home_team_data:
-                    print(f"DEBUG: Home team logo: {home_team_data.get('logo')}")
-                print(f"DEBUG: Away team data keys: {list(away_team_data.keys())}")
             
             game_info = {
                 'id': event.get('id'),
@@ -444,26 +441,31 @@ def fetch_games_by_date(date_str=None):
                 'away_score': int(away_team.get('score', 0)),
                 'status_text': status.get('type', {}).get('detail', 'Pre-Game'),
                 'period': status.get('period', 1),
-                'clock': status.get('displayClock', '20:00'),
+                'clock': status.get('displayClock', '20:00' if league == 'ncaab' else '12:00'),
                 'is_live': state == 'in',
                 'is_final': state == 'post',
                 'date': event.get('date', ''),
-                'state': state
+                'state': state,
+                'league': league
             }
             
-            # Parse time remaining
+            # Parse time remaining and convert to full-game minutes remaining
             if game_info['is_live']:
                 try:
                     clock = game_info['clock']
                     period = game_info['period']
                     if ':' in clock:
                         mins, secs = clock.split(':')
-                        minutes_left = int(mins)
-                        seconds_left = int(secs.split('.')[0])  # Remove decimals
+                        period_mins_left = int(mins)
+                        seconds_left = int(secs.split('.')[0])
                         
-                        # Auto-convert to full game time: add 20 min if first half
-                        if period == 1:
-                            minutes_left += 20
+                        if league == 'nba':
+                            # NBA: 4 quarters x 12 min. Remaining = clock + (remaining quarters * 12)
+                            remaining_quarters = max(0, 4 - period)
+                            minutes_left = period_mins_left + (remaining_quarters * 12)
+                        else:
+                            # NCAA: 2 halves x 20 min. Add 20 if first half
+                            minutes_left = period_mins_left + (20 if period == 1 else 0)
                         
                         game_info['minutes_left'] = minutes_left
                         game_info['seconds_left'] = seconds_left
@@ -474,27 +476,29 @@ def fetch_games_by_date(date_str=None):
                     game_info['minutes_left'] = 0
                     game_info['seconds_left'] = 0
             else:
-                game_info['minutes_left'] = 20 if state == 'pre' else 0
+                game_info['minutes_left'] = total_game_minutes if state == 'pre' else 0
                 game_info['seconds_left'] = 0
             
             games.append(game_info)
         
         return games
     except Exception as e:
-        print(f"Error fetching games: {e}")
+        print(f"Error fetching {league} games: {e}")
         return []
 
 def fetch_live_games():
     """Fetch current live games - wrapper for backwards compatibility"""
-    games = fetch_games_by_date()
-    # Only return live and pre-game for the fade system
-    return [g for g in games if g['state'] in ['in', 'pre']]
+    ncaab = fetch_games_by_date(league='ncaab')
+    nba = fetch_games_by_date(league='nba')
+    return [g for g in (ncaab + nba) if g['state'] in ['in', 'pre']]
 
-def fetch_team_recent_games(team_id, num_games=10):
+def fetch_team_recent_games(team_id, num_games=10, league='ncaab'):
     """Fetch recent games for a team to calculate averages"""
     try:
-        # ESPN team schedule endpoint
-        url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/{team_id}/schedule"
+        if league == 'nba':
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/schedule"
+        else:
+            url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/{team_id}/schedule"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
@@ -832,7 +836,8 @@ def create_fade_tab():
                             html.Div("League", className="label"),
                             dcc.Dropdown(id="game_length", options=[
                                 {"label": "NCAA", "value": 40},
-                                {"label": "NBA", "value": 48}
+                                {"label": "NBA", "value": 48},
+                                {"label": "International", "value": "intl"}
                             ], value=40, clearable=False, className="dark-dropdown")
                         ], width=6),
                         dbc.Col([
@@ -1147,26 +1152,33 @@ def adj_scores(inc, dec, t1, t2):
 )
 def refresh_espn_games(n):
     """Fetch games from ESPN every 30 sec (FREE - no API limit)"""
-    # Get extended date ranges for more games
     today = datetime.now().strftime('%Y%m%d')
     tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y%m%d')
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
     
-    # Include yesterday's late games that might still be live  
-    yesterday_games = fetch_games_by_date(yesterday)
-    today_games = fetch_games_by_date(today)
-    tomorrow_games = fetch_games_by_date(tomorrow)
+    # Fetch both NCAA and NBA for each date window
+    all_live_candidates = []
+    today_games = []
+    tomorrow_games = []
     
-    # Combine all current/live games from multiple days
-    all_live_candidates = yesterday_games + today_games + tomorrow_games
+    for league in ['ncaab', 'nba']:
+        yg = fetch_games_by_date(yesterday, league=league)
+        tg = fetch_games_by_date(today, league=league)
+        tmg = fetch_games_by_date(tomorrow, league=league)
+        
+        all_live_candidates.extend(yg + tg + tmg)
+        today_games.extend(tg)
+        tomorrow_games.extend(tmg)
+    
     live_games_expanded = [g for g in all_live_candidates if g['state'] in ['in', 'pre']]
     
     # Get week's games (next 10 days for more options)
     week_games = []
     for days_ahead in range(-1, 10):
         date_str = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y%m%d')
-        games = fetch_games_by_date(date_str)
-        week_games.extend(games)
+        for league in ['ncaab', 'nba']:
+            games = fetch_games_by_date(date_str, league=league)
+            week_games.extend(games)
     
     # Remove duplicates based on game ID
     seen_ids = set()
@@ -1176,7 +1188,9 @@ def refresh_espn_games(n):
             unique_week_games.append(game)
             seen_ids.add(game['id'])
     
-    print(f"🏀 ESPN: {len(live_games_expanded)} live/upcoming | {len(unique_week_games)} total games")
+    ncaab_count = sum(1 for g in unique_week_games if g.get('league') == 'ncaab')
+    nba_count = sum(1 for g in unique_week_games if g.get('league') == 'nba')
+    print(f"🏀 ESPN: {len(live_games_expanded)} live/upcoming | {ncaab_count} NCAAB + {nba_count} NBA = {len(unique_week_games)} total")
     return live_games_expanded, today_games, tomorrow_games, unique_week_games
 
 
@@ -1189,13 +1203,17 @@ def refresh_espn_games(n):
 def refresh_odds_data(n):
     """Fetch betting odds every 5 min (PAID - conserves API credits)
     
-    Budget math at 5-min interval:
-      12 calls/hr × 12 hrs active use = ~144 calls/day
-      144 × 30 days = ~4,320 calls/month (well under 20k limit)
+    Budget math at 5-min interval (2 calls per refresh: NCAAB + NBA):
+      24 calls/hr × 12 hrs active use = ~288 calls/day
+      288 × 30 days = ~8,640 calls/month (well under 20k limit)
     """
     try:
-        odds_games = get_basketball_odds()
-        betting_data = extract_betting_totals(odds_games)
+        ncaab_odds = get_basketball_odds('basketball_ncaab')
+        nba_odds = get_basketball_odds('basketball_nba')
+        
+        betting_data = extract_betting_totals(ncaab_odds)
+        nba_betting = extract_betting_totals(nba_odds)
+        betting_data.update(nba_betting)
         
         status = {
             "remaining": "?",
@@ -1205,7 +1223,7 @@ def refresh_odds_data(n):
             "calls_today": odds_api_calls_today
         }
         
-        print(f"💰 Odds API: Matched {len(betting_data)} games with betting lines")
+        print(f"💰 Odds API: Matched {len(betting_data)} games with betting lines (NCAAB + NBA)")
         return betting_data, status
     except Exception as e:
         print(f"❌ Error fetching odds: {e}")
@@ -1306,10 +1324,18 @@ def populate_game_modal(games_data, search_term):
             time_display = html.Div(time_str, className="game-time")
             details = "Upcoming"
         
+        league_label = game.get('league', 'ncaab').upper()
+        league_color = "#f59e0b" if league_label == 'NBA' else "#60a5fa"
+        league_badge = html.Span(league_label, style={
+            "fontSize": "0.6rem", "fontWeight": "700", "color": league_color,
+            "border": f"1px solid {league_color}", "borderRadius": "3px",
+            "padding": "1px 4px", "marginRight": "6px", "verticalAlign": "middle"
+        })
+        
         card = html.Div([
             time_display,
             html.Div([
-                # Away team with logo
+                league_badge,
                 html.Span([
                     html.Img(src=game.get('away_team_logo', ''), 
                             style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "3px", "verticalAlign": "middle"},
@@ -1319,7 +1345,6 @@ def populate_game_modal(games_data, search_term):
                 
                 html.Span(" @ ", style={"margin": "0 8px", "color": "#666"}),
                 
-                # Home team with logo  
                 html.Span([
                     html.Img(src=game.get('home_team_logo', ''), 
                             style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "3px", "verticalAlign": "middle"},
@@ -1365,11 +1390,11 @@ def select_game_from_modal(game_clicks, games_data):
     if clicked_index is not None and clicked_index < len(games_data):
         selected_game = games_data[clicked_index]
         
-        # Create display text with live score if available
+        league_tag = selected_game.get('league', 'ncaab').upper()
         if selected_game.get('is_live'):
-            game_text = f"{selected_game['away_team']} {selected_game['away_score']}-{selected_game['home_score']} {selected_game['home_team']}"
+            game_text = f"[{league_tag}] {selected_game['away_team']} {selected_game['away_score']}-{selected_game['home_score']} {selected_game['home_team']}"
         else:
-            game_text = f"{selected_game['away_team']} @ {selected_game['home_team']}"
+            game_text = f"[{league_tag}] {selected_game['away_team']} @ {selected_game['home_team']}"
         
         # Truncate if too long
         if len(game_text) > 40:
@@ -1422,26 +1447,28 @@ def store_selected_game(game_id, games_data):
     Output("live_total", "value", allow_duplicate=True),
     Output("mins_left", "value", allow_duplicate=True),
     Output("secs_left", "value", allow_duplicate=True),
+    Output("game_length", "value", allow_duplicate=True),
     Input("selected_game_data", "data"),
     State("betting_odds_data", "data"),
     prevent_initial_call=True
 )
 def auto_fill_from_game(game_data, betting_odds_data):
-    """Auto-fill scores, time, and live total from selected game"""
+    """Auto-fill scores, time, league, and live total from selected game"""
     if not game_data:
         raise dash.exceptions.PreventUpdate
     
-    # Extract scores from ESPN data structure
     home_score = int(game_data.get('home_score', 0) or 0)
     away_score = int(game_data.get('away_score', 0) or 0)
     
-    # Don't show "0" unless it's an actual score from live game
     if home_score == 0 and not game_data.get('is_live'):
         home_score = None
     if away_score == 0 and not game_data.get('is_live'):
         away_score = None
     
-    # Parse time from clock
+    # Auto-select league based on game
+    league = game_data.get('league', 'ncaab')
+    game_length = 48 if league == 'nba' else 40
+    
     minutes_left = 0
     seconds_left = 0
     
@@ -1457,9 +1484,12 @@ def auto_fill_from_game(game_data, betting_odds_data):
                 seconds_part = time_parts[1].split('.')[0]
                 seconds_left = int(seconds_part)
                 
-                # Auto-convert to full game time: add 20 min if first half
-                if period == 1:
-                    minutes_left += 20
+                if league == 'nba':
+                    remaining_quarters = max(0, 4 - period)
+                    minutes_left += remaining_quarters * 12
+                else:
+                    if period == 1:
+                        minutes_left += 20
         except (ValueError, IndexError):
             minutes_left = 0
             seconds_left = 0
@@ -1490,7 +1520,8 @@ def auto_fill_from_game(game_data, betting_odds_data):
         home_score,
         live_total,
         minutes_left,
-        seconds_left
+        seconds_left,
+        game_length
     )
 
 @app.callback(
@@ -1803,8 +1834,9 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
             ]), {"display": "block"}
         
         # Get team stats with error handling using dynamic games count
-        home_stats = get_team_stats(home_team_id, games_count)
-        away_stats = get_team_stats(away_team_id, games_count)
+        league = selected_game_data.get('league', 'ncaab')
+        home_stats = get_team_stats(home_team_id, games_count, league=league)
+        away_stats = get_team_stats(away_team_id, games_count, league=league)
         
         if not home_stats or not away_stats:
             return html.Div([
@@ -1816,8 +1848,9 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
             ]), {"display": "block"}
         
         # Calculate implied total
+        game_minutes = 48 if league == 'nba' else 40
         implied_total = home_stats['avg_team_score'] + away_stats['avg_team_score']
-        implied_total_per_min = implied_total / 40
+        implied_total_per_min = implied_total / game_minutes
         
         # Get betting line for this matchup
         betting_info = None
@@ -2144,6 +2177,12 @@ def create_game_card(game, betting_odds_data=None):
         dbc.Row([
             dbc.Col([
                 html.Div([
+                    html.Span(game.get('league', 'ncaab').upper(), style={
+                        "fontSize": "0.6rem", "fontWeight": "700",
+                        "color": "#f59e0b" if game.get('league') == 'nba' else "#60a5fa",
+                        "border": f"1px solid {'#f59e0b' if game.get('league') == 'nba' else '#60a5fa'}",
+                        "borderRadius": "3px", "padding": "1px 4px", "marginRight": "6px"
+                    }),
                     html.Span(status_text, style={"fontSize": "0.7rem", "color": status_color, "fontWeight": "600"}),
                     html.Span(f"  {time_display}", style={"fontSize": "0.7rem", "color": "#666", "marginLeft": "8px"})
                 ]),
@@ -2188,31 +2227,30 @@ def create_game_card(game, betting_odds_data=None):
         "transition": "all 0.2s ease"
     }, className="analysis-game-card")
 
-def get_team_stats(team_id, num_games=10):
+def get_team_stats(team_id, num_games=10, league='ncaab'):
     """Helper function to get team statistics"""
     try:
         if not team_id:
             return None
         
-        recent_games = fetch_team_recent_games(team_id, num_games)
+        recent_games = fetch_team_recent_games(team_id, num_games, league=league)
         if not recent_games:
             print(f"No recent games found for team {team_id}")
             return None
         
-        # Calculate averages
+        game_minutes = 48 if league == 'nba' else 40
+        
         avg_team_score = sum(g['team_score'] for g in recent_games) / len(recent_games)
         avg_opp_score = sum(g['opponent_score'] for g in recent_games) / len(recent_games)
         avg_total = sum(g['total_points'] for g in recent_games) / len(recent_games)
         
-        # Calculate additional stats
         home_games = [g for g in recent_games if g.get('location') == 'Home']
         away_games = [g for g in recent_games if g.get('location') == 'Away']
         
         home_avg = sum(g['team_score'] for g in home_games) / len(home_games) if home_games else 0
         away_avg = sum(g['team_score'] for g in away_games) / len(away_games) if away_games else 0
         
-        # Calculate points per minute (PPG / 40)
-        avg_points_per_minute = avg_team_score / 40
+        avg_points_per_minute = avg_team_score / game_minutes
         
         return {
             'recent_games': recent_games,
