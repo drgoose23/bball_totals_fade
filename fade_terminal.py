@@ -57,57 +57,97 @@ app.index_string = '''
         {%favicon%}
         {%css%}
         <style>
+            :root {
+                --bg-base: #080b10;
+                --bg-surface: #0d1117;
+                --bg-elevated: #131920;
+                --bg-card: #111820;
+                --bg-card-hover: #161f2a;
+                --border-subtle: rgba(255,255,255,0.05);
+                --border-default: rgba(255,255,255,0.08);
+                --border-accent: rgba(74,158,255,0.3);
+                --accent-blue: #4a9eff;
+                --accent-blue-glow: rgba(74,158,255,0.15);
+                --accent-blue-dim: rgba(74,158,255,0.6);
+                --text-primary: #e8eaf0;
+                --text-secondary: #8892a4;
+                --text-muted: #4a5568;
+                --signal-green: #00d4a8;
+                --signal-green-glow: rgba(0,212,168,0.15);
+                --signal-yellow: #f5a623;
+                --signal-red: #ff4f5e;
+                --radius-sm: 6px;
+                --radius-md: 10px;
+                --radius-lg: 14px;
+            }
+
             * { box-sizing: border-box; }
 
             body {
-                background: #111;
+                background: var(--bg-base);
+                background-image:
+                    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(74,158,255,0.07) 0%, transparent 60%),
+                    radial-gradient(ellipse 50% 30% at 80% 80%, rgba(0,212,168,0.04) 0%, transparent 50%);
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-                color: #e5e5e5;
+                color: var(--text-primary);
                 line-height: 1.5;
                 min-height: 100vh;
             }
 
-            /* Cards */
+            /* ── Cards ─────────────────────────────────────────── */
             .card, .pro-card {
-                background: #1a1a1a;
-                border: 1px solid #2a2a2a;
-                border-radius: 10px;
+                background: var(--bg-card);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-lg);
                 padding: 1.5rem;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.3);
+                position: relative;
+                overflow: hidden;
+            }
+            .pro-card::before {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; right: 0;
+                height: 1px;
+                background: linear-gradient(90deg, transparent, rgba(74,158,255,0.4), transparent);
+                pointer-events: none;
             }
             .output-card {
-                background: #1a1a1a;
-                border: 1px solid #2a2a2a;
-                border-radius: 10px;
+                background: var(--bg-card);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-lg);
+                box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.3);
             }
 
-            /* Inputs */
+            /* ── Inputs ─────────────────────────────────────────── */
             .form-control {
-                background: #1a1a1a !important;
-                border: 1px solid #333 !important;
-                color: #e5e5e5 !important;
-                border-radius: 6px !important;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-default) !important;
+                color: var(--text-primary) !important;
+                border-radius: var(--radius-sm) !important;
                 font-size: 0.9rem;
                 padding: 0.5rem 0.75rem;
+                transition: border-color 0.2s, box-shadow 0.2s;
             }
             .form-control:focus {
-                border-color: #4a9eff !important;
-                box-shadow: none !important;
-                background: #1a1a1a !important;
+                border-color: var(--accent-blue) !important;
+                box-shadow: 0 0 0 3px var(--accent-blue-glow) !important;
+                background: var(--bg-elevated) !important;
             }
-            .form-control::placeholder { color: #555 !important; }
+            .form-control::placeholder { color: var(--text-muted) !important; }
             .input-group-text {
-                background: #1a1a1a !important;
-                border: 1px solid #333 !important;
-                color: #888 !important;
-                border-radius: 6px !important;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-default) !important;
+                color: var(--text-secondary) !important;
+                border-radius: var(--radius-sm) !important;
             }
 
-            /* Score +/- buttons */
+            /* ── Micro buttons ──────────────────────────────────── */
             .btn-adj {
-                background: #222 !important;
-                border: 1px solid #333 !important;
-                color: #999 !important;
-                border-radius: 6px;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-default) !important;
+                color: var(--text-secondary) !important;
+                border-radius: var(--radius-sm);
                 font-weight: 600;
                 font-size: 0.85rem;
                 min-width: 36px;
@@ -115,14 +155,14 @@ app.index_string = '''
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                transition: all 0.15s;
             }
-            .btn-adj:hover { background: #2a2a2a !important; color: #fff !important; border-color: #4a9eff !important; }
+            .btn-adj:hover { background: rgba(74,158,255,0.1) !important; color: var(--accent-blue) !important; border-color: var(--border-accent) !important; }
 
-            /* Small +/- buttons */
             .btn-adj-small, .btn-micro {
-                background: #222 !important;
-                border: 1px solid #333 !important;
-                color: #777 !important;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-subtle) !important;
+                color: var(--text-muted) !important;
                 border-radius: 4px !important;
                 font-size: 0.7rem !important;
                 padding: 0.15rem 0.35rem !important;
@@ -131,188 +171,287 @@ app.index_string = '''
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
+                transition: all 0.15s;
             }
-            .btn-adj-small:hover, .btn-micro:hover { color: #fff !important; border-color: #4a9eff !important; }
+            .btn-adj-small:hover, .btn-micro:hover {
+                color: var(--accent-blue) !important;
+                border-color: var(--border-accent) !important;
+                background: var(--accent-blue-glow) !important;
+            }
 
-            /* Labels */
+            /* ── Labels / Typography ────────────────────────────── */
             .label {
-                font-size: 0.7rem;
-                color: #888;
+                font-size: 0.68rem;
+                color: var(--text-muted);
                 text-transform: uppercase;
-                letter-spacing: 0.8px;
+                letter-spacing: 1.2px;
                 margin-bottom: 0.4rem;
-                font-weight: 600;
+                font-weight: 700;
             }
             .metric-value {
-                font-family: 'SF Mono', 'Consolas', monospace;
+                font-family: 'JetBrains Mono', 'SF Mono', monospace;
                 font-weight: 700;
                 font-size: 2rem;
                 color: #fff;
                 line-height: 1;
             }
             .metric-label {
-                font-size: 0.7rem;
-                font-weight: 600;
-                letter-spacing: 1px;
+                font-size: 0.65rem;
+                font-weight: 700;
+                letter-spacing: 1.2px;
                 text-transform: uppercase;
-                color: #888;
+                color: var(--text-muted);
                 margin-bottom: 0.3rem;
             }
 
-            /* Dropdowns */
+            /* ── Dropdowns ──────────────────────────────────────── */
             .dark-dropdown .Select-control {
-                background: #1a1a1a !important;
-                border: 1px solid #333 !important;
-                color: #e5e5e5 !important;
-                border-radius: 6px !important;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-default) !important;
+                color: var(--text-primary) !important;
+                border-radius: var(--radius-sm) !important;
                 min-height: 38px;
                 font-size: 0.85rem;
             }
-            .dark-dropdown .Select-placeholder { color: #555 !important; }
-            .dark-dropdown .Select-value-label { color: #e5e5e5 !important; font-weight: 500; }
-            .dark-dropdown .Select-input > input { color: #e5e5e5 !important; }
+            .dark-dropdown .Select-control:hover { border-color: var(--border-accent) !important; }
+            .dark-dropdown .Select-placeholder { color: var(--text-muted) !important; }
+            .dark-dropdown .Select-value-label { color: var(--text-primary) !important; font-weight: 500; }
+            .dark-dropdown .Select-input > input { color: var(--text-primary) !important; }
             .dark-dropdown .Select-menu-outer {
-                background: #1a1a1a !important;
-                border: 1px solid #333 !important;
-                border-radius: 6px !important;
-                margin-top: 2px;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-default) !important;
+                border-radius: var(--radius-sm) !important;
+                margin-top: 3px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
             }
             .dark-dropdown .Select-menu { background: transparent !important; }
             .dark-dropdown .Select-option {
-                color: #aaa !important;
+                color: var(--text-secondary) !important;
                 background: transparent !important;
                 padding: 8px 12px !important;
                 font-size: 0.85rem;
             }
-            .dark-dropdown .Select-option.is-focused { background: #252525 !important; color: #fff !important; }
-            .dark-dropdown .Select-option.is-selected { background: #222 !important; color: #4a9eff !important; }
+            .dark-dropdown .Select-option.is-focused { background: rgba(74,158,255,0.08) !important; color: var(--text-primary) !important; }
+            .dark-dropdown .Select-option.is-selected { background: rgba(74,158,255,0.12) !important; color: var(--accent-blue) !important; }
 
-            /* Buttons */
+            /* ── Buttons ────────────────────────────────────────── */
             .btn-primary {
-                background: #4a9eff !important;
+                background: linear-gradient(135deg, #4a9eff, #2d7dd6) !important;
                 border: none !important;
-                border-radius: 6px !important;
+                border-radius: var(--radius-sm) !important;
                 font-weight: 600 !important;
                 color: #fff !important;
                 font-size: 0.85rem !important;
+                box-shadow: 0 2px 12px rgba(74,158,255,0.25) !important;
+                transition: all 0.2s !important;
             }
-            .btn-primary:hover { background: #3a8eef !important; }
+            .btn-primary:hover {
+                background: linear-gradient(135deg, #5aadff, #3d8de6) !important;
+                box-shadow: 0 4px 20px rgba(74,158,255,0.4) !important;
+                transform: translateY(-1px);
+            }
+            .btn-primary.active, .btn-primary:active {
+                background: linear-gradient(135deg, #4a9eff, #2d7dd6) !important;
+            }
             .btn-secondary {
-                background: #222 !important;
-                border: 1px solid #333 !important;
-                color: #aaa !important;
-                border-radius: 6px !important;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-default) !important;
+                color: var(--text-secondary) !important;
+                border-radius: var(--radius-sm) !important;
                 font-size: 0.85rem !important;
+                transition: all 0.15s !important;
             }
-            .btn-secondary:hover { background: #2a2a2a !important; color: #fff !important; }
+            .btn-secondary:hover { background: var(--bg-card-hover) !important; color: var(--text-primary) !important; border-color: var(--border-accent) !important; }
 
-            /* Slider */
-            .rc-slider { background: #2a2a2a !important; height: 4px !important; }
-            .rc-slider-track { background: #4a9eff !important; height: 4px !important; }
+            /* ── Slider ─────────────────────────────────────────── */
+            .rc-slider { background: rgba(255,255,255,0.06) !important; height: 4px !important; border-radius: 2px; }
+            .rc-slider-track { background: linear-gradient(90deg, #4a9eff, #00d4a8) !important; height: 4px !important; }
             .rc-slider-handle {
                 background: #fff !important;
-                border: 2px solid #4a9eff !important;
+                border: 2px solid var(--accent-blue) !important;
                 width: 16px !important;
                 height: 16px !important;
                 margin-top: -6px !important;
-                box-shadow: none !important;
+                box-shadow: 0 0 8px rgba(74,158,255,0.5) !important;
             }
-            .rc-slider-mark-text { color: #666 !important; font-size: 0.7rem !important; }
+            .rc-slider-mark-text { color: var(--text-muted) !important; font-size: 0.7rem !important; }
 
-            /* Tabs */
+            /* ── Tabs ───────────────────────────────────────────── */
             .nav-tabs {
-                border-bottom: 1px solid #2a2a2a;
+                border-bottom: 1px solid var(--border-subtle);
+                gap: 4px;
             }
             .nav-tabs .nav-link {
                 background: transparent;
                 border: none;
-                color: #888;
-                font-weight: 500;
-                padding: 0.6rem 1.2rem;
-                border-radius: 6px 6px 0 0;
-                font-size: 0.85rem;
+                color: var(--text-muted);
+                font-weight: 600;
+                padding: 0.6rem 1.4rem;
+                border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+                font-size: 0.82rem;
+                letter-spacing: 0.3px;
+                transition: all 0.15s;
             }
-            .nav-tabs .nav-link:hover { color: #e5e5e5; }
+            .nav-tabs .nav-link:hover { color: var(--text-secondary); background: rgba(255,255,255,0.02); }
             .nav-tabs .nav-link.active {
-                color: #4a9eff;
+                color: var(--accent-blue);
                 background: transparent;
-                border-bottom: 2px solid #4a9eff;
+                border-bottom: 2px solid var(--accent-blue);
+                text-shadow: 0 0 20px rgba(74,158,255,0.4);
             }
 
-            /* Headings - just white, no gradients */
+            /* ── Headings ───────────────────────────────────────── */
             h1, h2, h3, h4, h5, h6 {
                 font-family: 'Inter', sans-serif;
-                font-weight: 600;
-                color: #fff;
-                -webkit-text-fill-color: #fff;
+                font-weight: 700;
+                color: var(--text-primary);
+                -webkit-text-fill-color: var(--text-primary);
                 background: none;
             }
 
-            /* Game selector button */
+            /* ── App Header ─────────────────────────────────────── */
+            .app-header {
+                padding: 1.75rem 0 1.25rem 0;
+                text-align: center;
+                position: relative;
+            }
+            .app-title {
+                font-size: 1.35rem;
+                font-weight: 800;
+                letter-spacing: -0.3px;
+                background: linear-gradient(135deg, #e8eaf0 30%, #4a9eff 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                margin: 0;
+            }
+            .app-subtitle {
+                font-size: 0.7rem;
+                color: var(--text-muted);
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                font-weight: 600;
+                margin-top: 2px;
+            }
+
+            /* ── Game selector button ───────────────────────────── */
             .game-selector-btn {
-                background: #1a1a1a !important;
-                border: 1px solid #333 !important;
-                border-radius: 6px !important;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-default) !important;
+                border-radius: var(--radius-sm) !important;
+                transition: all 0.15s;
+                color: var(--text-secondary) !important;
             }
-            .game-selector-btn:hover { border-color: #4a9eff !important; }
+            .game-selector-btn:hover {
+                border-color: var(--border-accent) !important;
+                background: rgba(74,158,255,0.05) !important;
+                color: var(--text-primary) !important;
+            }
 
-            /* Game cards in modal */
+            /* ── Game cards in modal ────────────────────────────── */
             .game-card {
-                background: #1e1e1e;
-                border: 1px solid #2a2a2a;
-                border-radius: 8px;
-                padding: 0.8rem 1rem;
-                margin: 0.4rem 0;
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-subtle);
+                border-radius: var(--radius-md);
+                padding: 0.85rem 1rem;
+                margin: 0.35rem 0;
                 cursor: pointer;
+                transition: all 0.15s ease;
             }
-            .game-card:hover { background: #252525; border-color: #4a9eff; }
-            .game-time { color: #4a9eff; font-weight: 600; font-size: 0.8rem; margin-bottom: 0.3rem; }
-            .game-matchup { color: #e5e5e5; font-weight: 500; font-size: 0.9rem; }
-            .game-details { color: #888; font-size: 0.8rem; }
-            .live-indicator { color: #ef4444; font-weight: 600; font-size: 0.75rem; }
+            .game-card:hover {
+                background: var(--bg-card-hover);
+                border-color: var(--border-accent);
+                transform: translateX(2px);
+            }
+            .game-time { color: var(--accent-blue); font-weight: 600; font-size: 0.78rem; margin-bottom: 0.25rem; }
+            .game-matchup { color: var(--text-primary); font-weight: 500; font-size: 0.88rem; }
+            .game-details { color: var(--text-secondary); font-size: 0.78rem; margin-top: 3px; }
+            .live-indicator {
+                color: #ff4f5e;
+                font-weight: 700;
+                font-size: 0.72rem;
+                letter-spacing: 0.5px;
+                animation: pulse-red 2s ease-in-out infinite;
+            }
+            @keyframes pulse-red {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
 
-            /* Analysis cards */
+            /* ── Signal glow animation ──────────────────────────── */
+            .signal-badge {
+                position: relative;
+            }
+            .signal-badge::after {
+                content: '';
+                position: absolute;
+                inset: -1px;
+                border-radius: inherit;
+                opacity: 0.4;
+                animation: signal-pulse 3s ease-in-out infinite;
+                pointer-events: none;
+            }
+            @keyframes signal-pulse {
+                0%, 100% { opacity: 0.2; transform: scale(1); }
+                50% { opacity: 0.5; transform: scale(1.01); }
+            }
+
+            /* ── Metric cards ───────────────────────────────────── */
+            .metric-card {
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-subtle);
+                border-radius: var(--radius-md);
+                padding: 0.9rem 0.75rem;
+                text-align: center;
+                transition: border-color 0.2s;
+            }
+
+            /* ── Analysis cards ─────────────────────────────────── */
             .analysis-game-card {
-                background: #1e1e1e !important;
-                border: 1px solid #2a2a2a !important;
-                border-radius: 8px !important;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-subtle) !important;
+                border-radius: var(--radius-md) !important;
+                transition: all 0.15s ease !important;
             }
-            .analysis-game-card:hover { background: #252525 !important; border-color: #4a9eff !important; }
+            .analysis-game-card:hover {
+                background: var(--bg-card-hover) !important;
+                border-color: var(--border-accent) !important;
+                transform: translateX(2px);
+            }
 
-            /* Team logos */
+            /* ── Team logos ─────────────────────────────────────── */
             .team-logo {
                 object-fit: contain;
-                background: #1a1a1a;
-                border-radius: 4px;
-                border: 1px solid #2a2a2a;
+                background: transparent;
+                border-radius: 3px;
             }
             .team-logo[src=""], .team-logo:not([src]) { display: none; }
 
-            /* Refresh button */
-            #refresh_game_button { transition: all 0.15s ease; }
+            /* ── Refresh button ─────────────────────────────────── */
+            #refresh_game_button { transition: all 0.2s ease; }
             #refresh_game_button:hover {
-                background: rgba(74, 158, 255, 0.1) !important;
-                border-color: #4a9eff !important;
-                color: #4a9eff !important;
+                background: var(--accent-blue-glow) !important;
+                border-color: var(--accent-blue) !important;
+                color: var(--accent-blue) !important;
                 transform: rotate(180deg);
             }
 
-            /* Scrollbar */
-            ::-webkit-scrollbar { width: 6px; }
-            ::-webkit-scrollbar-track { background: #1a1a1a; }
-            ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-            ::-webkit-scrollbar-thumb:hover { background: #444; }
+            /* ── Scrollbar ──────────────────────────────────────── */
+            ::-webkit-scrollbar { width: 5px; height: 5px; }
+            ::-webkit-scrollbar-track { background: transparent; }
+            ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+            ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
 
-            /* Hide number spinners globally */
+            /* ── Hide number spinners ───────────────────────────── */
             input[type="number"]::-webkit-outer-spin-button,
             input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
             input[type="number"] { -moz-appearance: textfield; }
 
-            /* Tiny nudge buttons for time/total */
+            /* ── Nudge buttons ──────────────────────────────────── */
             .nudge-btn {
-                background: #222 !important;
-                border: 1px solid #333 !important;
-                color: #666 !important;
+                background: var(--bg-elevated) !important;
+                border: 1px solid var(--border-subtle) !important;
+                color: var(--text-muted) !important;
                 border-radius: 3px !important;
                 font-size: 0.6rem !important;
                 padding: 0 !important;
@@ -323,8 +462,13 @@ app.index_string = '''
                 align-items: center !important;
                 justify-content: center !important;
                 cursor: pointer !important;
+                transition: all 0.12s;
             }
-            .nudge-btn:hover { color: #fff !important; border-color: #4a9eff !important; }
+            .nudge-btn:hover {
+                color: var(--accent-blue) !important;
+                border-color: var(--border-accent) !important;
+                background: var(--accent-blue-glow) !important;
+            }
             .nudge-wrap {
                 display: flex;
                 flex-direction: column;
@@ -332,6 +476,54 @@ app.index_string = '''
                 margin-left: 4px;
                 justify-content: center;
             }
+
+            /* ── Dividers ───────────────────────────────────────── */
+            hr { border-color: var(--border-subtle) !important; }
+
+            /* ── Section header row ─────────────────────────────── */
+            .section-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 1rem;
+            }
+            .section-dot {
+                width: 6px; height: 6px;
+                border-radius: 50%;
+                background: var(--accent-blue);
+                box-shadow: 0 0 8px var(--accent-blue);
+                flex-shrink: 0;
+            }
+
+            /* ── Modal ──────────────────────────────────────────── */
+            .modal-content {
+                background: var(--bg-surface) !important;
+                border: 1px solid var(--border-default) !important;
+                border-radius: var(--radius-lg) !important;
+                box-shadow: 0 24px 80px rgba(0,0,0,0.7) !important;
+            }
+
+            /* ── Toggle / Checklist ─────────────────────────────── */
+            .form-check-input {
+                background-color: var(--bg-elevated) !important;
+                border-color: var(--border-default) !important;
+            }
+            .form-check-input:checked {
+                background-color: var(--accent-blue) !important;
+                border-color: var(--accent-blue) !important;
+                box-shadow: 0 0 8px rgba(74,158,255,0.4) !important;
+            }
+            .form-check-label { color: var(--text-secondary) !important; font-size: 0.78rem !important; }
+
+            /* ── Button group (schedule) ────────────────────────── */
+            .btn-group .btn { transition: all 0.15s; }
+
+            /* ── Fade-in animation ──────────────────────────────── */
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(6px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .pro-card, .output-card { animation: fadeIn 0.3s ease; }
         </style>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
@@ -773,21 +965,28 @@ app.layout = dbc.Container([
         dbc.Input(
             id="game_reminder_input",
             type="text",
-            placeholder="Game reminder...",
-            style={"width": "200px", "fontSize": "0.8rem"}
+            placeholder="📌 Note...",
+            style={"width": "180px", "fontSize": "0.78rem", "background": "rgba(13,17,23,0.8)",
+                   "border": "1px solid rgba(255,255,255,0.07)", "color": "#8892a4",
+                   "borderRadius": "6px", "padding": "0.35rem 0.65rem"}
         )
-    ], style={"position": "absolute", "top": "12px", "left": "12px", "zIndex": "1000"}),
-    
+    ], style={"position": "absolute", "top": "14px", "left": "14px", "zIndex": "1000"}),
+
     # Header
     html.Div([
-        html.H3("CBB Fade Terminal", style={"marginBottom": "0", "fontSize": "1.4rem"}),
-    ], className="text-center", style={"padding": "1.5rem 0 1rem 0"}),
-    
+        html.Div([
+            html.Div("▣", style={"fontSize": "1.1rem", "color": "#4a9eff",
+                                  "marginRight": "10px", "opacity": "0.85"}),
+            html.H3("CBB Fade Terminal", className="app-title"),
+        ], style={"display": "inline-flex", "alignItems": "center"}),
+        html.Div("Live Under Analysis", className="app-subtitle"),
+    ], className="app-header"),
+
     # Tabs
     dbc.Tabs([
         dbc.Tab(label="Live Analysis", tab_id="fade-tab"),
         dbc.Tab(label="Research", tab_id="analysis-tab"),
-    ], id="main-tabs", active_tab="fade-tab", className="mb-3"),
+    ], id="main-tabs", active_tab="fade-tab", className="mb-4"),
     
     html.Div(id="tab-content"),
     
@@ -808,19 +1007,25 @@ app.layout = dbc.Container([
     # Game Selection Modal
     dbc.Modal([
         dbc.ModalHeader([
-            html.H5("Select Game", style={"margin": "0"}),
-        ], style={"background": "#1a1a1a", "borderBottom": "1px solid #2a2a2a"}),
+            html.Div([
+                html.Div(className="section-dot"),
+                html.H5("Select Game", style={"margin": "0", "fontSize": "1rem", "fontWeight": "700"}),
+            ], className="section-header", style={"marginBottom": "0"}),
+        ], style={"background": "var(--bg-surface)", "borderBottom": "1px solid var(--border-subtle)",
+                  "padding": "1rem 1.25rem"}),
         dbc.ModalBody([
             dbc.Input(
                 id="game_search_input",
-                placeholder="Search teams...", 
-                style={"marginBottom": "0.75rem"}
+                placeholder="🔍  Search teams...",
+                style={"marginBottom": "0.75rem", "background": "var(--bg-elevated)",
+                       "border": "1px solid var(--border-default)", "color": "var(--text-primary)",
+                       "borderRadius": "8px", "fontSize": "0.85rem"}
             ),
-            html.Div(id="game_selection_grid", style={"maxHeight": "50vh", "overflowY": "auto"})
-        ], style={"background": "#1a1a1a", "padding": "1rem"}),
+            html.Div(id="game_selection_grid", style={"maxHeight": "50vh", "overflowY": "auto", "paddingRight": "2px"})
+        ], style={"background": "var(--bg-surface)", "padding": "1rem 1.25rem"}),
         dbc.ModalFooter([
             dbc.Button("Cancel", id="game_modal_close", className="btn-secondary", size="sm")
-        ], style={"background": "#1a1a1a", "borderTop": "1px solid #2a2a2a"})
+        ], style={"background": "var(--bg-surface)", "borderTop": "1px solid var(--border-subtle)", "padding": "0.75rem 1.25rem"})
     ], id="game_selection_modal", is_open=False, centered=True, size="lg", backdrop="static")
 ], fluid=True, style={"maxWidth": "1200px", "padding": "0 1.5rem"})
 
@@ -831,42 +1036,54 @@ def create_fade_tab():
         # Inputs
         dbc.Col([
             html.Div([
-                    dbc.Row([
-                        dbc.Col([
-                            html.Div("League", className="label"),
-                            dcc.Dropdown(id="game_length", options=[
-                                {"label": "NCAA", "value": 40},
-                                {"label": "NBA", "value": 48},
-                                {"label": "International", "value": "intl"}
-                            ], value=40, clearable=False, className="dark-dropdown")
-                        ], width=6),
-                        dbc.Col([
-                            html.Div("Period", className="label"),
-                            dcc.Dropdown(id="period_type", options=[], value=None, clearable=False, className="dark-dropdown")
-                        ], width=6),
-                    ], className="mb-3"),
-                    
+                # Section label
+                html.Div([
+                    html.Div(className="section-dot"),
+                    html.Span("Game Setup", style={"fontSize": "0.72rem", "fontWeight": "700",
+                                                    "letterSpacing": "1.2px", "textTransform": "uppercase",
+                                                    "color": "var(--text-muted)"})
+                ], className="section-header", style={"marginBottom": "1rem"}),
+
+                dbc.Row([
+                    dbc.Col([
+                        html.Div("League", className="label"),
+                        dcc.Dropdown(id="game_length", options=[
+                            {"label": "NCAA", "value": 40},
+                            {"label": "NBA", "value": 48},
+                            {"label": "International", "value": "intl"}
+                        ], value=40, clearable=False, className="dark-dropdown")
+                    ], width=6),
+                    dbc.Col([
+                        html.Div("Period", className="label"),
+                        dcc.Dropdown(id="period_type", options=[], value=None, clearable=False, className="dark-dropdown")
+                    ], width=6),
+                ], className="mb-3"),
+
+                html.Div([
                     html.Div([
-                        html.Div([
-                            html.Span("Live Game", className="label"),
-                            html.Span(" (ESPN)", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "4px"})
-                        ]),
-                        html.Div([
-                            html.Button(
-                                id="game_selector_button",
-                                children=[
-                                    html.Div("Select Game", id="game_selector_text", style={"color": "#888"}),
-                                    html.Div("⌄", style={"marginLeft": "auto"})
-                                ],
-                                className="game-selector-btn",
-                                style={
-                                    "width": "100%", 
-                                    "display": "flex", 
-                                    "alignItems": "center",
-                                    "justifyContent": "space-between",
-                                    "padding": "0.5rem 0.75rem",
-                                    "cursor": "pointer",
-                                }
+                        html.Span("Live Game", className="label"),
+                        html.Span("ESPN", style={"fontSize": "0.6rem", "color": "var(--text-muted)",
+                                                  "marginLeft": "6px", "background": "rgba(255,255,255,0.05)",
+                                                  "padding": "1px 5px", "borderRadius": "3px",
+                                                  "border": "1px solid rgba(255,255,255,0.06)"})
+                    ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.4rem"}),
+                    html.Div([
+                        html.Button(
+                            id="game_selector_button",
+                            children=[
+                                html.Div("Select Game", id="game_selector_text",
+                                         style={"color": "var(--text-muted)", "fontSize": "0.85rem"}),
+                                html.Div("⌄", style={"marginLeft": "auto", "color": "var(--text-muted)"})
+                            ],
+                            className="game-selector-btn",
+                            style={
+                                "width": "100%",
+                                "display": "flex",
+                                "alignItems": "center",
+                                "justifyContent": "space-between",
+                                "padding": "0.5rem 0.75rem",
+                                "cursor": "pointer",
+                            }
                         ),
                         html.Button(
                             "↻",
@@ -874,7 +1091,7 @@ def create_fade_tab():
                             className="btn btn-secondary",
                             style={
                                 "width": "36px",
-                                "height": "36px", 
+                                "height": "36px",
                                 "marginLeft": "6px",
                                 "fontSize": "1rem",
                                 "display": "flex",
@@ -883,77 +1100,89 @@ def create_fade_tab():
                             },
                             title="Refresh live scores and time"
                         ),
-                        ], style={"display": "flex", "alignItems": "start"}),
-                        # Store selected game ID and button text separately for persistence
-                        dcc.Store(id="live_game_selector", data=None),
-                        dcc.Store(id="selected_game_text", data="Select Game"),
-                    ], className="mb-4"),
-                    
-                    dbc.Row([
-                        dbc.Col(score_input("Home", "team1"), width=6),
-                        dbc.Col(score_input("Away", "team2"), width=6),
-                    ]),
-                    
+                    ], style={"display": "flex", "alignItems": "start"}),
+                    dcc.Store(id="live_game_selector", data=None),
+                    dcc.Store(id="selected_game_text", data="Select Game"),
+                ], className="mb-4"),
+
+                # Thin divider
+                html.Hr(style={"margin": "0 0 1rem 0"}),
+
+                dbc.Row([
+                    dbc.Col(score_input("Home Score", "team1"), width=6),
+                    dbc.Col(score_input("Away Score", "team2"), width=6),
+                ]),
+
+                html.Div([
+                    html.Div("Betting Total (O/U)", className="label"),
                     html.Div([
-                        html.Div("Live Total", className="label"),
+                        dbc.Input(id="live_total", type="number", style={"flex": "1",
+                                  "fontFamily": "'JetBrains Mono', monospace", "fontWeight": "600",
+                                  "fontSize": "0.95rem"}),
                         html.Div([
-                            dbc.Input(id="live_total", type="number", style={"flex": "1"}),
+                            html.Button("▲", id="live_total_up", className="nudge-btn", n_clicks=0),
+                            html.Button("▼", id="live_total_down", className="nudge-btn", n_clicks=0),
+                        ], className="nudge-wrap")
+                    ], style={"display": "flex", "alignItems": "center"})
+                ], className="mb-3"),
+
+                dbc.Row([
+                    dbc.Col([
+                        html.Div("Minutes Left", className="label"),
+                        html.Div([
+                            dbc.Input(id="mins_left", type="number", min=0, style={"flex": "1"}),
                             html.Div([
-                                html.Button("▲", id="live_total_up", className="nudge-btn", n_clicks=0),
-                                html.Button("▼", id="live_total_down", className="nudge-btn", n_clicks=0),
+                                html.Button("▲", id="mins_up", className="nudge-btn", n_clicks=0),
+                                html.Button("▼", id="mins_down", className="nudge-btn", n_clicks=0),
                             ], className="nudge-wrap")
                         ], style={"display": "flex", "alignItems": "center"})
-                    ], className="mb-3"),
-                    
-                    dbc.Row([
-                        dbc.Col([
-                            html.Div("Minutes", className="label"),
-                            html.Div([
-                                dbc.Input(id="mins_left", type="number", min=0, style={"flex": "1"}),
-                                html.Div([
-                                    html.Button("▲", id="mins_up", className="nudge-btn", n_clicks=0),
-                                    html.Button("▼", id="mins_down", className="nudge-btn", n_clicks=0),
-                                ], className="nudge-wrap")
-                            ], style={"display": "flex", "alignItems": "center"})
-                        ], width=6),
-                        dbc.Col([
-                            html.Div("Seconds", className="label"),
-                            html.Div([
-                                dbc.Input(id="secs_left", type="number", min=0, max=59, style={"flex": "1"}),
-                                html.Div([
-                                    html.Button("▲", id="secs_up", className="nudge-btn", n_clicks=0),
-                                    html.Button("▼", id="secs_down", className="nudge-btn", n_clicks=0),
-                                ], className="nudge-wrap")
-                            ], style={"display": "flex", "alignItems": "center"})
-                        ], width=6),
-                    ], className="mb-2"),
-                    
-                    # First Half Toggle
-                    html.Div([
-                        dbc.Checklist(
-                            id="first_half_toggle",
-                            options=[{"label": "First Half (+20 min)", "value": "first_half"}],
-                            value=[],
-                            inline=True,
-                            style={"fontSize": "0.75rem", "color": "#888"}
-                        )
-                    ], className="mb-3", style={"textAlign": "center"}),
-                    
-                    html.Div([
-                        html.Div("Your Under (optional)", className="label"),
-                        dbc.Input(id="my_bet", type="number"),
-                    ], className="mb-4"),
-                    
-                    html.Div([
+                    ], width=6),
+                    dbc.Col([
+                        html.Div("Seconds", className="label"),
                         html.Div([
-                            html.Span("Threshold: ", style={"color": "#888", "fontSize": "0.75rem"}),
-                            html.Span(id="thresh_val", style={"color": "#e5e5e5", "fontWeight": "600"})
-                        ], className="mb-2"),
-                        dcc.Slider(id="threshold_slider", min=2.5, max=6, step=0.25, value=4.0,
-                                   marks={2.5: '2.5', 4: '4', 6: '6'})
-                    ])
+                            dbc.Input(id="secs_left", type="number", min=0, max=59, style={"flex": "1"}),
+                            html.Div([
+                                html.Button("▲", id="secs_up", className="nudge-btn", n_clicks=0),
+                                html.Button("▼", id="secs_down", className="nudge-btn", n_clicks=0),
+                            ], className="nudge-wrap")
+                        ], style={"display": "flex", "alignItems": "center"})
+                    ], width=6),
+                ], className="mb-2"),
+
+                # First Half Toggle
+                html.Div([
+                    dbc.Checklist(
+                        id="first_half_toggle",
+                        options=[{"label": "First Half  (+20 min)", "value": "first_half"}],
+                        value=[],
+                        inline=True,
+                        style={"fontSize": "0.75rem"}
+                    )
+                ], className="mb-3 mt-1", style={"textAlign": "center"}),
+
+                html.Hr(style={"margin": "0 0 1rem 0"}),
+
+                html.Div([
+                    html.Div("Your Under (optional)", className="label"),
+                    dbc.Input(id="my_bet", type="number",
+                              style={"fontFamily": "'JetBrains Mono', monospace", "fontWeight": "600"}),
+                ], className="mb-4"),
+
+                html.Div([
+                    html.Div([
+                        html.Span("Fade Threshold", style={"color": "var(--text-secondary)", "fontSize": "0.72rem",
+                                                            "textTransform": "uppercase", "letterSpacing": "1px",
+                                                            "fontWeight": "700"}),
+                        html.Span(id="thresh_val", style={"color": "var(--accent-blue)", "fontWeight": "700",
+                                                           "fontFamily": "'JetBrains Mono', monospace",
+                                                           "fontSize": "0.9rem", "marginLeft": "auto"})
+                    ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.6rem"}),
+                    dcc.Slider(id="threshold_slider", min=2.5, max=6, step=0.25, value=4.0,
+                               marks={2.5: '2.5', 4: '4', 6: '6'})
+                ])
             ], className="pro-card")
         ], lg=4, md=5),
+
         dbc.Col([
             html.Div(id="output"),
             html.Div([
@@ -973,7 +1202,7 @@ def create_fade_tab():
                     dbc.Col(width=8)
                 ], className="mb-3")
             ], id="analysis_controls", style={"display": "none"}),
-            html.Div(id="team_context_display", className="mt-3")  
+            html.Div(id="team_context_display", className="mt-3")
         ], lg=8, md=7)
     ])
 
@@ -982,27 +1211,37 @@ def create_analysis_tab():
     return html.Div([
         dbc.Row([
             dbc.Col([
-                html.H5("Game Schedule", className="mb-3", style={"fontWeight": "600"}),
-                
+                html.Div([
+                    html.Div(className="section-dot"),
+                    html.H5("Game Schedule", style={"fontWeight": "700", "margin": "0", "fontSize": "0.95rem"}),
+                ], className="section-header"),
+
                 dbc.ButtonGroup([
-                    dbc.Button("Today", id="today-btn", color="primary", size="sm"),
-                    dbc.Button("Tomorrow", id="tomorrow-btn", color="secondary", size="sm"),
-                    dbc.Button("This Week", id="week-btn", color="secondary", size="sm"),
+                    dbc.Button("Today", id="today-btn", color="primary", size="sm",
+                               style={"fontWeight": "600", "fontSize": "0.78rem", "letterSpacing": "0.3px"}),
+                    dbc.Button("Tomorrow", id="tomorrow-btn", color="secondary", size="sm",
+                               style={"fontWeight": "600", "fontSize": "0.78rem"}),
+                    dbc.Button("This Week", id="week-btn", color="secondary", size="sm",
+                               style={"fontWeight": "600", "fontSize": "0.78rem"}),
                 ], className="mb-3"),
-                
+
                 html.Div(id="games-display", className="card", style={"minHeight": "400px"})
             ], width=6),
-            
+
             dbc.Col([
-                html.H5("Team Analysis", className="mb-3", style={"fontWeight": "600"}),
-                
                 html.Div([
-                    html.Div("Team Comparison Analysis", className="label"),
+                    html.Div(className="section-dot", style={"background": "#00d4a8", "boxShadow": "0 0 8px #00d4a8"}),
+                    html.H5("Team Analysis", style={"fontWeight": "700", "margin": "0", "fontSize": "0.95rem"}),
+                ], className="section-header"),
+
+                html.Div([
+                    html.Div("Compare Teams", className="label", style={"marginBottom": "0.5rem"}),
                     dbc.Row([
                         dbc.Col([
                             dcc.Dropdown(
                                 id="team1_selector",
                                 options=[],
+                                placeholder="Away team...",
                                 clearable=True,
                                 searchable=True,
                                 className="dark-dropdown"
@@ -1010,8 +1249,9 @@ def create_analysis_tab():
                         ], width=6),
                         dbc.Col([
                             dcc.Dropdown(
-                                id="team2_selector", 
+                                id="team2_selector",
                                 options=[],
+                                placeholder="Home team...",
                                 clearable=True,
                                 searchable=True,
                                 className="dark-dropdown"
@@ -1019,34 +1259,36 @@ def create_analysis_tab():
                         ], width=6),
                     ]),
                 ], className="mb-3"),
-                
+
                 html.Div([
                     dbc.Row([
                         dbc.Col([
-                            html.Div("Lookback Games", className="label"),
+                            html.Div("Lookback", className="label"),
                             dbc.InputGroup([
                                 dbc.Input(
                                     id="games_count_input",
                                     type="text",
                                     value="5",
-                                    style={"textAlign": "center", "maxWidth": "60px"}
+                                    style={"textAlign": "center", "maxWidth": "60px",
+                                           "fontFamily": "'JetBrains Mono', monospace", "fontWeight": "600"}
                                 ),
                                 dbc.InputGroupText("games")
                             ], size="sm")
                         ], width=4),
                         dbc.Col([
                             html.Div([
-                                html.Span("Analysis Based On: ", className="label", style={"display": "inline-block", "marginRight": "6px"}),
-                                html.Span(id="games_count_display", style={"fontSize": "0.8rem", "color": "#4a9eff", "fontWeight": "600"})
-                            ], style={"marginTop": "1rem"})
-                        ], width=9),
+                                html.Span(id="games_count_display",
+                                          style={"fontSize": "0.78rem", "color": "var(--accent-blue)",
+                                                 "fontWeight": "700", "fontFamily": "'JetBrains Mono', monospace"})
+                            ], style={"marginTop": "1.5rem"})
+                        ], width=8),
                     ]),
                 ], className="mb-3"),
-                
+
                 html.Div(id="team-analysis-display", className="card", style={"minHeight": "400px"})
             ], width=6)
         ]),
-        
+
         # Hidden button for callback compatibility
         html.Button(
             id="game_selector_button",
@@ -1636,9 +1878,14 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
     if None in [t1, t2, live_total, period] or min_left <= 0:
         return html.Div([
             html.Div([
-                html.Span("Awaiting input", style={"color": "#555", "fontSize": "0.85rem"})
-            ], className="text-center py-5")
-        ], className="output-card", style={"minHeight": "400px", "display": "flex", 
+                html.Div("◎", style={"fontSize": "2rem", "color": "rgba(74,158,255,0.2)",
+                                      "marginBottom": "0.75rem", "lineHeight": "1"}),
+                html.Div("Enter game data", style={"color": "var(--text-muted)", "fontSize": "0.82rem",
+                                                    "fontWeight": "600", "letterSpacing": "0.5px"}),
+                html.Div("Fill in scores, total, and time remaining",
+                         style={"color": "rgba(74,82,104,0.6)", "fontSize": "0.72rem", "marginTop": "4px"})
+            ], style={"textAlign": "center"})
+        ], className="output-card", style={"minHeight": "420px", "display": "flex",
                                            "alignItems": "center", "justifyContent": "center"})
     
     r = get_fade_analysis(t1, t2, live_total, min_left, my_bet, period, threshold)
@@ -1646,65 +1893,77 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
     over_thresh = r['required_pace'] >= r['threshold']
     curr = r['actual_pace']
     req = r['required_pace']
-    
+
     # Signal logic
     if pct >= 25 and over_thresh:
-        signal, signal_color, border_color = "Under", "#4ade80", "#4ade8044"
+        signal, signal_color, signal_bg = "UNDER", "#00d4a8", "rgba(0,212,168,0.07)"
+        signal_icon = "↓"
     elif pct >= 10 and over_thresh:
-        signal, signal_color, border_color = "Under", "#86efac", "#86efac33"
+        signal, signal_color, signal_bg = "UNDER", "#34d399", "rgba(52,211,153,0.07)"
+        signal_icon = "↓"
     elif pct >= 0 or not over_thresh:
-        signal, signal_color, border_color = "Hold", "#888888", "#88888833"
+        signal, signal_color, signal_bg = "HOLD", "#94a3b8", "rgba(148,163,184,0.06)"
+        signal_icon = "—"
     elif pct >= -15:
-        signal, signal_color, border_color = "Hold", "#fbbf24", "#fbbf2433"
+        signal, signal_color, signal_bg = "HOLD", "#f5a623", "rgba(245,166,35,0.07)"
+        signal_icon = "—"
     else:
-        signal, signal_color, border_color = "Pass", "#f87171", "#f8717133"
+        signal, signal_color, signal_bg = "PASS", "#ff4f5e", "rgba(255,79,94,0.07)"
+        signal_icon = "↑"
 
-    # Pace visualization - line chart
-    max_y = max(req, curr, 1) * 1.25
+    # Pace visualization
+    max_y = max(req, curr, 1) * 1.3
     fig = go.Figure()
-    
-    # Convert hex to rgba for fill
+
     r_col = int(signal_color[1:3], 16)
     g_col = int(signal_color[3:5], 16)
     b_col = int(signal_color[5:7], 16)
-    fill_rgba = f'rgba({r_col}, {g_col}, {b_col}, 0.25)'
-    
-    fig.add_trace(go.Scatter(
-        x=['Current', 'Required'],
+    fill_rgba = f'rgba({r_col}, {g_col}, {b_col}, 0.12)'
+    fill_rgba_line = f'rgba({r_col}, {g_col}, {b_col}, 0.5)'
+
+    # Background reference bar
+    fig.add_trace(go.Bar(
+        x=['Current Pace', 'Required Pace'],
         y=[curr, req],
-        fill='tozeroy',
-        fillcolor=fill_rgba,
-        line=dict(color=signal_color, width=3),
-        mode='lines+markers+text',
-        marker=dict(size=[10, 12], color=['#666', signal_color], line=dict(color='#222', width=2)),
-        text=[f'{curr}', f'{req}'],
-        textposition=['top center', 'top center'],
-        textfont=dict(family='Inter', size=14, color='#e4e4e7'),
-        hoverinfo='skip'
+        marker=dict(
+            color=[f'rgba({r_col},{g_col},{b_col},0.12)', f'rgba({r_col},{g_col},{b_col},0.22)'],
+            line=dict(color=[f'rgba({r_col},{g_col},{b_col},0.4)', signal_color], width=[1, 2]),
+        ),
+        text=[f'{curr:.2f}', f'{req:.2f}'],
+        textposition='outside',
+        textfont=dict(family='JetBrains Mono', size=13, color=['#8892a4', signal_color]),
+        hoverinfo='skip',
+        width=0.45
     ))
-    
-    fig.add_hline(y=curr, line_dash="dot", line_color="#3f3f46", line_width=1)
-    
-    if pct > 0:
-        fig.add_annotation(
-            x=0.5, xref="paper", y=(curr + req) / 2,
-            text=f"+{pct:.0f}%",
-            showarrow=False,
-            font=dict(family='Inter', size=14, color=signal_color, weight=600),
-            opacity=0.9
-        )
-    
+
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='#161616',
-        height=150,
-        margin=dict(l=40, r=20, t=20, b=30),
-        xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(family='Inter', size=11, color='#666'), fixedrange=True),
-        yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#222', zeroline=False, 
-                   tickfont=dict(family='Inter', size=10, color='#555'),
-                   title=dict(text='pts/min', font=dict(size=10, color='#555')), fixedrange=True),
-        showlegend=False
+        plot_bgcolor='rgba(0,0,0,0)',
+        height=160,
+        margin=dict(l=8, r=8, t=28, b=8),
+        xaxis=dict(
+            showgrid=False, zeroline=False,
+            tickfont=dict(family='Inter', size=11, color='#4a5568'),
+            fixedrange=True
+        ),
+        yaxis=dict(
+            range=[0, max_y], showgrid=True, gridcolor='rgba(255,255,255,0.04)',
+            zeroline=False, tickfont=dict(family='JetBrains Mono', size=9, color='#4a5568'),
+            fixedrange=True
+        ),
+        showlegend=False,
+        bargap=0.5
     )
+
+    if pct != 0:
+        pct_display = f"+{pct:.0f}%" if pct > 0 else f"{pct:.0f}%"
+        fig.add_annotation(
+            x=0.5, xref="paper", y=max_y * 0.88,
+            text=pct_display,
+            showarrow=False,
+            font=dict(family='JetBrains Mono', size=16, color=signal_color),
+            opacity=0.9
+        )
 
     # Position tracker
     position_block = None
@@ -1712,76 +1971,143 @@ def update_output(t1, t2, live_total, mins, secs, my_bet, period, threshold):
         pts_needed = my_bet - r['total']
         pace_needed = pts_needed / min_left if min_left > 0 else float('inf')
         busted = pts_needed <= 0
-        pos_color = "#ef4444" if busted else "#22c55e"
+        pos_color = "#ff4f5e" if busted else "#00d4a8"
         pos_status = "BUSTED" if busted else "ACTIVE"
         position_block = html.Div([
-            html.Div(className="divider"),
-            dbc.Row([
-                dbc.Col([
-                    html.Span("POSITION", className="metric-label"),
+            html.Hr(style={"margin": "1rem 0", "borderColor": "rgba(255,255,255,0.05)"}),
+            html.Div([
+                html.Div([
+                    html.Div("POSITION", className="metric-label"),
                     html.Div([
-                        html.Span(f"U{my_bet}", style={"fontSize": "1.2rem", "color": "#e0e0e0"}),
-                        html.Span(f"  {pos_status}", style={"fontSize": "0.75rem", "color": pos_color, "marginLeft": "8px"})
+                        html.Span(f"U{my_bet}", style={
+                            "fontSize": "1.15rem", "fontWeight": "700", "color": "#e8eaf0",
+                            "fontFamily": "'JetBrains Mono', monospace"
+                        }),
+                        html.Span(f" · {pos_status}", style={"fontSize": "0.7rem", "color": pos_color,
+                                                               "marginLeft": "8px", "fontWeight": "700",
+                                                               "letterSpacing": "0.5px"})
                     ])
-                ], width=4),
-                dbc.Col([
-                    html.Span("PTS TO MISS", className="metric-label"),
-                    html.Div(f"{pts_needed}", style={"fontSize": "1.2rem", "color": pos_color})
-                ], width=4),
-                dbc.Col([
-                    html.Span("PACE TO MISS", className="metric-label"),
-                    html.Div(f"{pace_needed:.2f}", style={"fontSize": "1.2rem", "color": pos_color})
-                ], width=4),
-            ])
-        ], className="mt-3")
+                ], style={"flex": "1"}),
+                html.Div([
+                    html.Div("PTS TO MISS", className="metric-label"),
+                    html.Div(f"{pts_needed}", style={"fontSize": "1.15rem", "fontWeight": "700",
+                                                      "color": pos_color, "fontFamily": "'JetBrains Mono', monospace"})
+                ], style={"flex": "1", "textAlign": "center"}),
+                html.Div([
+                    html.Div("PACE TO MISS", className="metric-label"),
+                    html.Div(f"{pace_needed:.2f}", style={"fontSize": "1.15rem", "fontWeight": "700",
+                                                           "color": pos_color, "fontFamily": "'JetBrains Mono', monospace"})
+                ], style={"flex": "1", "textAlign": "right"}),
+            ], style={"display": "flex", "alignItems": "flex-start"})
+        ])
 
     return html.Div([
         html.Div([
-            # Signal Header
+            # ── Signal Header ────────────────────────────────────
             html.Div([
-                html.H3(signal, style={"fontSize": "1.6rem", "fontWeight": "700", "color": signal_color, "margin": "0"}),
-                html.P(f"U{r['live_total']}" if pct >= 10 and over_thresh else "Monitor", 
-                       style={"fontSize": "0.85rem", "color": "#888", "margin": "0.3rem 0 0 0"})
+                html.Div([
+                    html.Span(signal_icon, style={
+                        "fontSize": "1.6rem", "marginRight": "12px", "opacity": "0.7",
+                        "lineHeight": "1", "color": signal_color
+                    }),
+                    html.Div([
+                        html.H3(signal, style={
+                            "fontSize": "2rem", "fontWeight": "800", "color": signal_color,
+                            "margin": "0", "lineHeight": "1", "letterSpacing": "-0.5px",
+                            "fontFamily": "'Inter', sans-serif",
+                            "textShadow": f"0 0 30px {signal_color}66"
+                        }),
+                        html.Div(
+                            f"U{r['live_total']}" if pct >= 10 and over_thresh else "Monitor closely",
+                            style={"fontSize": "0.78rem", "color": "var(--text-muted)",
+                                   "marginTop": "2px", "fontWeight": "600", "letterSpacing": "0.5px"}
+                        )
+                    ])
+                ], style={"display": "flex", "alignItems": "center", "justifyContent": "center"}),
             ], style={
                 "textAlign": "center",
-                "padding": "1.2rem",
-                "marginBottom": "1.2rem",
-                "borderRadius": "8px",
-                "background": "#1e1e1e",
-                "border": f"1px solid {signal_color}40"
+                "padding": "1.25rem 1.5rem",
+                "marginBottom": "1.25rem",
+                "borderRadius": "10px",
+                "background": signal_bg,
+                "border": f"1px solid {signal_color}30",
+                "boxShadow": f"0 4px 24px {signal_color}15, inset 0 1px 0 {signal_color}20"
             }),
-            
-            # Metrics Grid
+
+            # ── Metrics Grid ─────────────────────────────────────
             dbc.Row([
                 dbc.Col([
-                    html.Div("Current Score", className="metric-label"),
-                    html.Div(f"{r['total']}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#e5e5e5"})
-                ], className="text-center", width=3),
+                    html.Div([
+                        html.Div("Score", className="metric-label"),
+                        html.Div(f"{r['total']}", style={
+                            "fontSize": "1.5rem", "fontWeight": "700", "color": "var(--text-primary)",
+                            "fontFamily": "'JetBrains Mono', monospace", "lineHeight": "1"
+                        })
+                    ], className="metric-card")
+                ], width=3),
                 dbc.Col([
-                    html.Div("Points Needed", className="metric-label"),
-                    html.Div(f"{r['needed']}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#f59e0b"})
-                ], className="text-center", width=3),
+                    html.Div([
+                        html.Div("Pts Needed", className="metric-label"),
+                        html.Div(f"{r['needed']}", style={
+                            "fontSize": "1.5rem", "fontWeight": "700", "color": "#f5a623",
+                            "fontFamily": "'JetBrains Mono', monospace", "lineHeight": "1"
+                        })
+                    ], className="metric-card")
+                ], width=3),
                 dbc.Col([
-                    html.Div("Current Pace", className="metric-label"),
-                    html.Div(f"{curr:.1f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#60a5fa"})
-                ], className="text-center", width=3),
+                    html.Div([
+                        html.Div("Cur Pace", className="metric-label"),
+                        html.Div(f"{curr:.1f}", style={
+                            "fontSize": "1.5rem", "fontWeight": "700", "color": "#4a9eff",
+                            "fontFamily": "'JetBrains Mono', monospace", "lineHeight": "1"
+                        })
+                    ], className="metric-card")
+                ], width=3),
                 dbc.Col([
-                    html.Div("Required Pace", className="metric-label"),
-                    html.Div(f"{req:.1f}", style={"fontSize": "1.4rem", "fontWeight": "700", "color": signal_color})
-                ], className="text-center", width=3),
-            ], className="mb-3"),
-            
-            # Time
+                    html.Div([
+                        html.Div("Req Pace", className="metric-label"),
+                        html.Div(f"{req:.1f}", style={
+                            "fontSize": "1.5rem", "fontWeight": "700", "color": signal_color,
+                            "fontFamily": "'JetBrains Mono', monospace", "lineHeight": "1",
+                            "textShadow": f"0 0 16px {signal_color}55"
+                        })
+                    ], className="metric-card")
+                ], width=3),
+            ], className="mb-3", style={"gap": "0"}),
+
+            # ── Time bar ─────────────────────────────────────────
             html.Div([
-                html.Span(f"{r['elapsed']}m elapsed", style={"color": "#666"}),
-                html.Span(" · ", style={"color": "#444"}),
-                html.Span(f"{r['remaining']}m remaining", style={"color": "#666"})
-            ], className="text-center mb-3", style={"fontSize": "0.8rem"}),
-            
-            # Pace chart
+                html.Div([
+                    html.Span(f"{r['elapsed']:.1f}m", style={"color": "var(--text-secondary)", "fontWeight": "600",
+                                                               "fontFamily": "'JetBrains Mono', monospace",
+                                                               "fontSize": "0.82rem"}),
+                    html.Span(" elapsed", style={"color": "var(--text-muted)", "fontSize": "0.75rem"}),
+                ]),
+                html.Div([
+                    html.Span(f"{r['remaining']:.1f}m", style={"color": "var(--accent-blue)", "fontWeight": "600",
+                                                                  "fontFamily": "'JetBrains Mono', monospace",
+                                                                  "fontSize": "0.82rem"}),
+                    html.Span(" remaining", style={"color": "var(--text-muted)", "fontSize": "0.75rem"}),
+                ]),
+            ], style={"display": "flex", "justifyContent": "space-between", "padding": "0.5rem 0.25rem",
+                      "marginBottom": "0.5rem"}),
+
+            # ── Progress bar (time remaining) ─────────────────────
+            html.Div([
+                html.Div(style={
+                    "height": "3px",
+                    "borderRadius": "2px",
+                    "background": f"linear-gradient(90deg, {signal_color} 0%, {signal_color}88 100%)",
+                    "width": f"{min(100, (r['remaining'] / period) * 100):.1f}%",
+                    "transition": "width 0.5s ease"
+                })
+            ], style={"background": "rgba(255,255,255,0.05)", "borderRadius": "2px",
+                      "marginBottom": "1rem", "height": "3px"}),
+
+            # ── Pace chart ────────────────────────────────────────
             dcc.Graph(figure=fig, config={'displayModeBar': False, 'staticPlot': True}),
-            
-            # Position tracker
+
+            # ── Position tracker ──────────────────────────────────
             position_block if position_block else ""
         ], className="pro-card")
     ])
@@ -1866,145 +2192,142 @@ def update_team_context(selected_game_data, games_count, betting_odds_data):
         
         return html.Div([
         html.Div([
-            # Clean Header with Team Logos
+            # Header
             html.Div([
-                html.H5("Matchup Intelligence", 
-                       style={"color": "#e5e5e5", "fontSize": "1.1rem", "fontWeight": "600", "margin": "0 0 0.5rem 0"}),
                 html.Div([
-                    html.Img(src=selected_game_data.get('away_team_logo', ''), 
-                            style={"width": "20px", "height": "20px", "marginRight": "6px", "borderRadius": "2px"},
+                    html.Div(className="section-dot", style={"background": "#f5a623", "boxShadow": "0 0 8px #f5a62388"}),
+                    html.H5("Matchup Intelligence",
+                           style={"color": "var(--text-primary)", "fontSize": "0.95rem",
+                                  "fontWeight": "700", "margin": "0"})
+                ], className="section-header", style={"marginBottom": "4px"}),
+                html.Div([
+                    html.Img(src=selected_game_data.get('away_team_logo', ''),
+                            style={"width": "18px", "height": "18px", "marginRight": "5px", "borderRadius": "2px"},
                             className="team-logo") if selected_game_data.get('away_team_logo') else None,
-                    html.Span(f"{away_team_name} @ ", style={"color": "#60a5fa"}),
-                    html.Img(src=selected_game_data.get('home_team_logo', ''), 
-                            style={"width": "20px", "height": "20px", "margin": "0 6px", "borderRadius": "2px"},
+                    html.Span(away_team_name, style={"color": "#60a5fa", "fontSize": "0.82rem", "fontWeight": "600"}),
+                    html.Span(" @ ", style={"color": "var(--text-muted)", "margin": "0 5px", "fontSize": "0.82rem"}),
+                    html.Img(src=selected_game_data.get('home_team_logo', ''),
+                            style={"width": "18px", "height": "18px", "marginRight": "5px", "borderRadius": "2px"},
                             className="team-logo") if selected_game_data.get('home_team_logo') else None,
-                    html.Span(home_team_name, style={"color": "#34d399"})
-                ], style={"display": "flex", "alignItems": "center", "fontSize": "0.9rem", "margin": "0"})
-            ], style={"marginBottom": "1.5rem"}),
-            
-            # Key Metrics Row
+                    html.Span(home_team_name, style={"color": "#34d399", "fontSize": "0.82rem", "fontWeight": "600"})
+                ], style={"display": "flex", "alignItems": "center"})
+            ], style={"marginBottom": "1.25rem"}),
+
+            # Key Metrics
             dbc.Row([
                 dbc.Col([
                     html.Div([
-                        html.Div("Projected Total pts/min", className="metric-label"),
-                        html.Div(f"{implied_total_per_min:.2f}", 
-                                style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#f59e0b", "lineHeight": "1"})
-                    ])
-                ], className="text-center", width=4),
+                        html.Div("Proj pts/min", className="metric-label"),
+                        html.Div(f"{implied_total_per_min:.2f}",
+                                style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#f5a623",
+                                       "lineHeight": "1", "fontFamily": "'JetBrains Mono', monospace"})
+                    ], className="metric-card")
+                ], width=4),
                 dbc.Col([
                     html.Div([
-                        html.Div("Betting Line" + (f" ({betting_info['num_books']} books)" if betting_info else ""), className="metric-label"),
-                        html.Div(f"{betting_info['avg_total']:.1f}" if betting_info else "No Line", 
-                                style={"fontSize": "1.6rem", "fontWeight": "700", 
-                                      "color": "#4a9eff" if betting_info else "#666", "lineHeight": "1"}),
-                        html.Div(f"{betting_info['avg_total'] / game_minutes:.2f} pts/min", 
-                                style={"fontSize": "0.7rem", "color": "#4a9eff", "opacity": "0.7", "marginTop": "2px"}) if betting_info else None
-                    ])
-                ], className="text-center", width=4),
+                        html.Div("Betting Line" + (f"  ·  {betting_info['num_books']}bk" if betting_info else ""), className="metric-label"),
+                        html.Div(f"{betting_info['avg_total']:.1f}" if betting_info else "—",
+                                style={"fontSize": "1.5rem", "fontWeight": "700",
+                                       "color": "var(--accent-blue)" if betting_info else "var(--text-muted)",
+                                       "lineHeight": "1", "fontFamily": "'JetBrains Mono', monospace"}),
+                        html.Div(f"{betting_info['avg_total'] / game_minutes:.2f} pts/min",
+                                style={"fontSize": "0.65rem", "color": "var(--accent-blue-dim)", "marginTop": "2px"}) if betting_info else None
+                    ], className="metric-card")
+                ], width=4),
                 dbc.Col([
                     html.Div([
                         html.Div("Avg Scoring", className="metric-label"),
-                        html.Div(
-                            f"{away_stats['avg_team_score']:.0f} + {home_stats['avg_team_score']:.0f}",
-                            style={"fontSize": "1.6rem", "fontWeight": "700", "color": "#d4d4d8", "lineHeight": "1"})
-                    ])
-                ], className="text-center", width=4),
-            ], className="mb-4"),
-            
+                        html.Div(f"{away_stats['avg_team_score']:.0f}+{home_stats['avg_team_score']:.0f}",
+                                style={"fontSize": "1.5rem", "fontWeight": "700", "color": "var(--text-primary)",
+                                       "lineHeight": "1", "fontFamily": "'JetBrains Mono', monospace"})
+                    ], className="metric-card")
+                ], width=4),
+            ], className="mb-3", style={"gap": "0"}),
+
             # Team Cards
             dbc.Row([
-                # Away Team
                 dbc.Col([
                     html.Div([
                         html.Div([
-                            # Team logo and name
-                            html.Div([
-                                html.Img(src=selected_game_data.get('away_team_logo', ''), 
-                                        style={"width": "24px", "height": "24px", "marginRight": "8px", "borderRadius": "3px"},
-                                        className="team-logo") if selected_game_data.get('away_team_logo') else None,
-                                html.H6(away_team_name[:18] + "..." if len(away_team_name) > 18 else away_team_name, 
-                                       style={"color": "#60a5fa", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0", "display": "inline"})
-                            ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
-                            html.Div(f"{away_stats['avg_team_score']:.1f}", 
-                                    style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#60a5fa", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#666", "marginBottom": "0.5rem"}),
-                            
-                            html.Div([
-                                html.Span(f"{away_stats['avg_points_per_minute']:.2f}", 
-                                         style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
-                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "2px"})
-                            ], className="mb-2"),
-                            
-                            html.Div([
-                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#999"}),
-                                html.Span(f"{away_stats['avg_opp_score']:.1f}", 
-                                         style={"fontSize": "0.75rem", "color": "#f87171", "fontWeight": "500"})
-                            ], className="mb-1"),
-                            
-                            html.Div([
-                                html.Span("Road: ", style={"fontSize": "0.75rem", "color": "#999"}),
-                                html.Span(f"{away_stats['away_avg']:.1f}" if away_stats['away_games'] > 0 else "N/A", 
-                                         style={"fontSize": "0.75rem", "color": "#d4d4d8", "fontWeight": "500"})
-                            ])
+                            html.Img(src=selected_game_data.get('away_team_logo', ''),
+                                    style={"width": "22px", "height": "22px", "marginRight": "8px", "borderRadius": "3px"},
+                                    className="team-logo") if selected_game_data.get('away_team_logo') else None,
+                            html.Span(away_team_name[:16] + "…" if len(away_team_name) > 16 else away_team_name,
+                                     style={"color": "#60a5fa", "fontSize": "0.85rem", "fontWeight": "700"})
+                        ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.6rem"}),
+                        html.Div(f"{away_stats['avg_team_score']:.1f}",
+                                style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#60a5fa",
+                                       "lineHeight": "1", "fontFamily": "'JetBrains Mono', monospace"}),
+                        html.Div("PPG", style={"fontSize": "0.62rem", "color": "var(--text-muted)",
+                                               "marginBottom": "0.5rem", "letterSpacing": "1px", "fontWeight": "700"}),
+                        html.Div([
+                            html.Span(f"{away_stats['avg_points_per_minute']:.2f}",
+                                     style={"color": "#f5a623", "fontWeight": "700",
+                                            "fontFamily": "'JetBrains Mono', monospace"}),
+                            html.Span(" pts/min", style={"fontSize": "0.62rem", "color": "var(--text-muted)", "marginLeft": "2px"})
+                        ], className="mb-2"),
+                        html.Div([
+                            html.Span("DEF  ", style={"fontSize": "0.7rem", "color": "var(--text-muted)", "letterSpacing": "0.5px"}),
+                            html.Span(f"{away_stats['avg_opp_score']:.1f}",
+                                     style={"fontSize": "0.7rem", "color": "#ff4f5e", "fontWeight": "600",
+                                            "fontFamily": "'JetBrains Mono', monospace"})
+                        ], className="mb-1"),
+                        html.Div([
+                            html.Span("AWAY  ", style={"fontSize": "0.7rem", "color": "var(--text-muted)", "letterSpacing": "0.5px"}),
+                            html.Span(f"{away_stats['away_avg']:.1f}" if away_stats['away_games'] > 0 else "—",
+                                     style={"fontSize": "0.7rem", "color": "var(--text-secondary)", "fontWeight": "600",
+                                            "fontFamily": "'JetBrains Mono', monospace"})
                         ])
                     ], style={
-                        "background": "#1e1e1e",
-                        "border": "1px solid #2a2a2a",
-                        "borderRadius": "8px",
+                        "background": "rgba(96,165,250,0.04)",
+                        "border": "1px solid rgba(96,165,250,0.15)",
+                        "borderRadius": "10px",
                         "padding": "1rem"
                     })
                 ], width=5),
-                
-                # VS Separator
+
                 dbc.Col([
-                    html.Div("VS", 
-                            style={
-                                "textAlign": "center", 
-                                "fontSize": "0.8rem", 
-                                "color": "#666", 
-                                "fontWeight": "600",
-                                "paddingTop": "2rem"
-                            })
+                    html.Div("VS",
+                            style={"textAlign": "center", "fontSize": "0.72rem", "color": "var(--text-muted)",
+                                   "fontWeight": "800", "paddingTop": "2.5rem", "letterSpacing": "2px"})
                 ], width=2),
-                
-                # Home Team
+
                 dbc.Col([
                     html.Div([
                         html.Div([
-                            # Team logo and name
-                            html.Div([
-                                html.Img(src=selected_game_data.get('home_team_logo', ''), 
-                                        style={"width": "24px", "height": "24px", "marginRight": "8px", "borderRadius": "3px"},
-                                        className="team-logo") if selected_game_data.get('home_team_logo') else None,
-                                html.H6(home_team_name[:18] + "..." if len(home_team_name) > 18 else home_team_name,
-                                       style={"color": "#34d399", "fontSize": "0.9rem", "fontWeight": "600", "margin": "0", "display": "inline"})
-                            ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.5rem"}),
-                            html.Div(f"{home_stats['avg_team_score']:.1f}", 
-                                    style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#34d399", "lineHeight": "1"}),
-                            html.Div("PPG", style={"fontSize": "0.7rem", "color": "#666", "marginBottom": "0.5rem"}),
-                            
-                            html.Div([
-                                html.Span(f"{home_stats['avg_points_per_minute']:.2f}", 
-                                         style={"fontSize": "1rem", "color": "#f59e0b", "fontWeight": "700"}),
-                                html.Span(" pts/min", style={"fontSize": "0.65rem", "color": "#666", "marginLeft": "2px"})
-                            ], className="mb-2"),
-                            
-                            html.Div([
-                                html.Span("Defense: ", style={"fontSize": "0.75rem", "color": "#999"}),
-                                html.Span(f"{home_stats['avg_opp_score']:.1f}", 
-                                         style={"fontSize": "0.75rem", "color": "#f87171", "fontWeight": "500"})
-                            ], className="mb-1"),
-                            
-                            html.Div([
-                                html.Span("Home: ", style={"fontSize": "0.75rem", "color": "#999"}),
-                                html.Span(f"{home_stats['home_avg']:.1f}" if home_stats['home_games'] > 0 else "N/A", 
-                                         style={"fontSize": "0.75rem", "color": "#d4d4d8", "fontWeight": "500"})
-                            ])
+                            html.Img(src=selected_game_data.get('home_team_logo', ''),
+                                    style={"width": "22px", "height": "22px", "marginRight": "8px", "borderRadius": "3px"},
+                                    className="team-logo") if selected_game_data.get('home_team_logo') else None,
+                            html.Span(home_team_name[:16] + "…" if len(home_team_name) > 16 else home_team_name,
+                                     style={"color": "#34d399", "fontSize": "0.85rem", "fontWeight": "700"})
+                        ], style={"display": "flex", "alignItems": "center", "marginBottom": "0.6rem"}),
+                        html.Div(f"{home_stats['avg_team_score']:.1f}",
+                                style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#34d399",
+                                       "lineHeight": "1", "fontFamily": "'JetBrains Mono', monospace"}),
+                        html.Div("PPG", style={"fontSize": "0.62rem", "color": "var(--text-muted)",
+                                               "marginBottom": "0.5rem", "letterSpacing": "1px", "fontWeight": "700"}),
+                        html.Div([
+                            html.Span(f"{home_stats['avg_points_per_minute']:.2f}",
+                                     style={"color": "#f5a623", "fontWeight": "700",
+                                            "fontFamily": "'JetBrains Mono', monospace"}),
+                            html.Span(" pts/min", style={"fontSize": "0.62rem", "color": "var(--text-muted)", "marginLeft": "2px"})
+                        ], className="mb-2"),
+                        html.Div([
+                            html.Span("DEF  ", style={"fontSize": "0.7rem", "color": "var(--text-muted)", "letterSpacing": "0.5px"}),
+                            html.Span(f"{home_stats['avg_opp_score']:.1f}",
+                                     style={"fontSize": "0.7rem", "color": "#ff4f5e", "fontWeight": "600",
+                                            "fontFamily": "'JetBrains Mono', monospace"})
+                        ], className="mb-1"),
+                        html.Div([
+                            html.Span("HOME  ", style={"fontSize": "0.7rem", "color": "var(--text-muted)", "letterSpacing": "0.5px"}),
+                            html.Span(f"{home_stats['home_avg']:.1f}" if home_stats['home_games'] > 0 else "—",
+                                     style={"fontSize": "0.7rem", "color": "var(--text-secondary)", "fontWeight": "600",
+                                            "fontFamily": "'JetBrains Mono', monospace"})
                         ])
                     ], style={
-                        "background": "#1e1e1e",
-                        "border": "1px solid #2a2a2a",
-                        "borderRadius": "8px",
+                        "background": "rgba(52,211,153,0.04)",
+                        "border": "1px solid rgba(52,211,153,0.15)",
+                        "borderRadius": "10px",
                         "padding": "1rem"
                     })
                 ], width=5),
@@ -2175,58 +2498,72 @@ def create_game_card(game, betting_odds_data=None):
         except:
             time_display = game['clock']
     
+    league_color = "#f5a623" if game.get('league') == 'nba' else "#60a5fa"
+
     return html.Div([
         dbc.Row([
             dbc.Col([
                 html.Div([
                     html.Span(game.get('league', 'ncaab').upper(), style={
-                        "fontSize": "0.6rem", "fontWeight": "700",
-                        "color": "#f59e0b" if game.get('league') == 'nba' else "#60a5fa",
-                        "border": f"1px solid {'#f59e0b' if game.get('league') == 'nba' else '#60a5fa'}",
-                        "borderRadius": "3px", "padding": "1px 4px", "marginRight": "6px"
+                        "fontSize": "0.58rem", "fontWeight": "800",
+                        "color": league_color,
+                        "border": f"1px solid {league_color}55",
+                        "background": f"{league_color}0d",
+                        "borderRadius": "3px", "padding": "1px 5px", "marginRight": "7px",
+                        "letterSpacing": "0.5px"
                     }),
-                    html.Span(status_text, style={"fontSize": "0.7rem", "color": status_color, "fontWeight": "600"}),
-                    html.Span(f"  {time_display}", style={"fontSize": "0.7rem", "color": "#666", "marginLeft": "8px"})
-                ]),
+                    html.Span(status_text, style={"fontSize": "0.68rem", "color": status_color,
+                                                   "fontWeight": "700", "letterSpacing": "0.3px"}),
+                    html.Span(f"  {time_display}", style={"fontSize": "0.68rem",
+                                                           "color": "var(--text-muted)", "marginLeft": "8px"})
+                ], style={"marginBottom": "5px"}),
                 html.Div([
-                    # Away team with logo
                     html.Span([
-                        html.Img(src=game.get('away_team_logo', ''), 
-                                style={"width": "16px", "height": "16px", "marginRight": "4px", "borderRadius": "2px", "verticalAlign": "middle"},
+                        html.Img(src=game.get('away_team_logo', ''),
+                                style={"width": "15px", "height": "15px", "marginRight": "4px",
+                                       "borderRadius": "2px", "verticalAlign": "middle"},
                                 className="team-logo") if game.get('away_team_logo') else None,
-                        html.Span(game['away_team'], style={"fontSize": "0.85rem", "color": "#e5e5e5", "verticalAlign": "middle"})
+                        html.Span(game['away_team'], style={"fontSize": "0.83rem", "color": "var(--text-primary)",
+                                                             "fontWeight": "500", "verticalAlign": "middle"})
                     ], style={"display": "inline-flex", "alignItems": "center"}),
-                    
-                    html.Span(f" {score_display} ", style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#fff", "margin": "0 6px"}),
-                    
-                    # Home team with logo
+                    html.Span(f" {score_display} ", style={"fontSize": "0.88rem", "fontWeight": "700",
+                                                            "color": "#fff", "margin": "0 6px",
+                                                            "fontFamily": "'JetBrains Mono', monospace"}),
                     html.Span([
-                        html.Img(src=game.get('home_team_logo', ''), 
-                                style={"width": "16px", "height": "16px", "marginRight": "4px", "borderRadius": "2px", "verticalAlign": "middle"},
+                        html.Img(src=game.get('home_team_logo', ''),
+                                style={"width": "15px", "height": "15px", "marginRight": "4px",
+                                       "borderRadius": "2px", "verticalAlign": "middle"},
                                 className="team-logo") if game.get('home_team_logo') else None,
-                        html.Span(game['home_team'], style={"fontSize": "0.85rem", "color": "#e5e5e5", "verticalAlign": "middle"})
+                        html.Span(game['home_team'], style={"fontSize": "0.83rem", "color": "var(--text-primary)",
+                                                             "fontWeight": "500", "verticalAlign": "middle"})
                     ], style={"display": "inline-flex", "alignItems": "center"})
                 ], style={"display": "flex", "alignItems": "center"}),
-                html.Div([
-                    html.Span("Click to analyze teams →", style={"fontSize": "0.65rem", "color": "#555", "fontStyle": "italic"})
-                ], style={"marginTop": "4px"})
+                html.Div("Tap to analyze →", style={"fontSize": "0.62rem", "color": "var(--text-muted)",
+                                                      "marginTop": "4px", "fontStyle": "italic"})
             ], width=7),
             dbc.Col([
                 html.Div([
-                    html.Span("Line: " if betting_total else "Total: ", style={"fontSize": "0.7rem", "color": "#666"}),
-                    html.Span(str(betting_total) if betting_total else (str(total_score) if total_score is not None else "—"), 
-                             style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#4a9eff" if betting_total else "#f59e0b"})
-                ], className="text-right")
-            ], width=5)
+                    html.Div("LINE" if betting_total else "TOTAL",
+                             style={"fontSize": "0.58rem", "fontWeight": "800", "letterSpacing": "1px",
+                                    "color": "var(--text-muted)", "marginBottom": "2px"}),
+                    html.Div(
+                        str(betting_total) if betting_total else (str(total_score) if total_score is not None else "—"),
+                        style={"fontSize": "1.1rem", "fontWeight": "700",
+                               "color": "var(--accent-blue)" if betting_total else "#f5a623",
+                               "fontFamily": "'JetBrains Mono', monospace",
+                               "textAlign": "right"}
+                    )
+                ], style={"textAlign": "right"})
+            ], width=5, style={"display": "flex", "alignItems": "center", "justifyContent": "flex-end"})
         ])
     ], id={"type": "analysis-game-card", "index": game['id']}, n_clicks=0, style={
-        "padding": "10px 12px",
-        "margin": "6px 0",
-        "border": "1px solid #2a2a2a",
-        "borderRadius": "8px",
-        "background": "#1a1a1a",
+        "padding": "10px 14px",
+        "margin": "5px 0",
+        "border": "1px solid var(--border-subtle)",
+        "borderRadius": "10px",
+        "background": "var(--bg-elevated)",
         "cursor": "pointer",
-        "transition": "all 0.2s ease"
+        "transition": "all 0.15s ease"
     }, className="analysis-game-card")
 
 def get_team_stats(team_id, num_games=10, league='ncaab'):
